@@ -1,1 +1,26 @@
+# Superpowers session ledger
 .superpowers/sdd/
+
+# Build outputs
+*.exe
+*.dll
+*.pdb
+*.zip
+
+# .NET
+bin/
+obj/
+packages/
+*.user
+*.suo
+*.cache
+*.log
+
+# Node / web-panel
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Temporary build artifacts
+.tmp/
+.vs/

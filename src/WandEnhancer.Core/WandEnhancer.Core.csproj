@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{CC5D9EE5-9989-4766-A9CF-28E8F0533B11}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>WandEnhancer.Core</RootNamespace>
+    <AssemblyName>WandEnhancer.Core</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+    <CMakeSourceDir>..\tools\asar-fuses-bypass</CMakeSourceDir>
+    <NativeBuildRoot>..\.tmp\cmake</NativeBuildRoot>
+    <NativeBuildConfiguration Condition="'$(Configuration)' == 'Debug'">Debug</NativeBuildConfiguration>
+    <NativeBuildConfiguration Condition="'$(NativeBuildConfiguration)' == ''">Release</NativeBuildConfiguration>
+    <CMakeBuildDir>$(NativeBuildRoot)\asar-fuses-bypass</CMakeBuildDir>
+    <ProxyDllPath>$(CMakeBuildDir)\$(NativeBuildConfiguration)\version.dll</ProxyDllPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\packages\Newtonsoft.Json.13.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AsarSharp\AsarSharp.csproj">
+      <Project>{BEAA604A-402A-4387-8903-A53FC913A26E}</Project>
+      <Name>AsarSharp</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Constants.cs" />
+    <Compile Include="Core\Enhancer.cs" />
+    <Compile Include="Core\EnhancerConfig.cs" />
+    <Compile Include="Extensions\PathExtensions.cs" />
+    <Compile Include="Models\ELogType.cs" />
+    <Compile Include="Models\PatchConfig.cs" />
+    <Compile Include="Models\WeModConfig.cs" />
+    <Compile Include="Models\WeModInfo.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Services\FileLogger.cs" />
+    <Compile Include="Services\ILogger.cs" />
+    <Compile Include="Services\IPatcher.cs" />
+    <Compile Include="Services\IProcessManager.cs" />
+    <Compile Include="Services\ISettingsStore.cs" />
+    <Compile Include="Services\IWeModLocator.cs" />
+    <Compile Include="Services\Patcher.cs" />
+    <Compile Include="Services\ProcessManager.cs" />
+    <Compile Include="Services\SettingsStore.cs" />
+    <Compile Include="Services\WeModLocator.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="$(ProxyDllPath)">
+      <LogicalName>proxydll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\web-panel\dist\**\*.*" Condition="Exists('..\web-panel\dist\index.html')">
+      <LogicalName>remote-panel/dist/%(RecursiveDir)%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Target Name="ValidateNativeArtifacts" BeforeTargets="BeforeBuild">
+    <Error Text="Proxy DLL not found: $(ProxyDllPath)"
+           Condition="!Exists('$(ProxyDllPath)')" />
+    <Message Text="Embedding Proxy DLL as resource from $(ProxyDllPath)" Importance="high" />
+  </Target>
+</Project>
