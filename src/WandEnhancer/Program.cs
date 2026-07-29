@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
@@ -41,8 +41,9 @@ namespace WandEnhancer
             {
                 if (args.Length >= 2 && string.Equals(args[0], "--enable-autopatch", StringComparison.OrdinalIgnoreCase))
                 {
-                    var wandPath = args[1].Trim('\"');
-                    if (!PathExtensions.CheckWeModPath(wandPath))
+                    var wandPath = args[1].Trim('"');
+                    var payloadPath = PathExtensions.ResolveWeModPayloadPath(wandPath);
+                    if (payloadPath == null)
                     {
                         MessageBox.Show($"The selected folder is not a valid Wand directory:\n{wandPath}", "WandEnhancer");
                         Environment.Exit(1);
@@ -50,6 +51,8 @@ namespace WandEnhancer
                     }
 
                     var autoPatchPath = GetAutoPatchExePath();
+                    // Store the root path (e.g. %LocalAppData%\WeMod) so future
+                    // updates that create new app-* subfolders are still handled.
                     new ShortcutRegistrar().Register(wandPath, autoPatchPath);
                     new ScheduledTaskRegistrar().Create(wandPath, autoPatchPath);
                     MessageBox.Show("Auto-patch enabled successfully.", "WandEnhancer");

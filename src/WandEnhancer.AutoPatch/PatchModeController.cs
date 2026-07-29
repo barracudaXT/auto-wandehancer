@@ -59,7 +59,9 @@ namespace WandEnhancer.AutoPatch
                     return false;
                 }
 
-                config.Path = info.BasePath;
+                // Store the root path so updates that create new app-* subfolders
+                // are still picked up by the watcher and launcher.
+                config.Path = info.RootPath ?? info.BasePath;
                 _settingsStore.Save(config);
 
                 progress?.Report("Terminating Wand processes...");

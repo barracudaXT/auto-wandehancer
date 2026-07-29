@@ -119,10 +119,9 @@ begin
   end;
 end;
 
-// Wand/WeMod sometimes installs under a versioned "app-x.y.z" subfolder
-// (e.g. %LocalAppData%\WeMod\app-12.43.1). This resolves the parent path
-// to the actual application folder if possible.
-function ResolveWandPath(BasePath: string): string;
+// Returns the latest app-* subfolder under BasePath that looks like a valid
+// Wand payload, or '' if none exists.
+function FindLatestAppSubfolder(BasePath: string): string;
 var
   FindRec: TFindRec;
   BestPath, Candidate, VersionPart: string;
@@ -131,13 +130,6 @@ begin
   Result := '';
   if BasePath = '' then Exit;
 
-  if LooksLikeWandPath(BasePath) then
-  begin
-    Result := BasePath;
-    Exit;
-  end;
-
-  // Look for app-* subfolders and prefer the numerically highest version.
   BestPath := '';
   BestVersion := -1;
   if FindFirst(BasePath + '\app-*', FindRec) then
@@ -169,12 +161,37 @@ begin
   Result := BestPath;
 end;
 
+// Accepts either a direct Wand payload folder (has Wand.exe + resources +
+// app.asar) or a WeMod "root" folder that contains a Wand.exe stub/launcher
+// and one or more app-* versioned payload subfolders.
+function IsWandRootFolder(Path: string): Boolean;
+begin
+  Result := (Path <> '') and DirExists(Path) and FileExists(Path + '\Wand.exe') and
+            (LooksLikeWandPath(Path) or (FindLatestAppSubfolder(Path) <> ''));
+end;
+
+// Resolves a user-selected or auto-detected folder to the actual folder that
+// should be patched. For a WeMod root folder this is the latest app-* subfolder.
+function ResolveWandPath(BasePath: string): string;
+begin
+  Result := '';
+  if BasePath = '' then Exit;
+
+  if LooksLikeWandPath(BasePath) then
+  begin
+    Result := BasePath;
+    Exit;
+  end;
+
+  Result := FindLatestAppSubfolder(BasePath);
+end;
+
 function TryGetWandPathFromRegistry(RootKey: Integer): string;
 var
   UninstallKey: string;
   SubKeyNames: TArrayOfString;
   I: Integer;
-  DisplayName, InstallLocation, ResolvedPath: string;
+  DisplayName, InstallLocation: string;
 begin
   Result := '';
   UninstallKey := 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall';
@@ -187,10 +204,9 @@ begin
          RegQueryStringValue(RootKey, UninstallKey + '\' + SubKeyNames[I], 'InstallLocation', InstallLocation) and
          (InstallLocation <> '') then
       begin
-        ResolvedPath := ResolveWandPath(InstallLocation);
-        if ResolvedPath <> '' then
+        if IsWandRootFolder(InstallLocation) then
         begin
-          Result := ResolvedPath;
+          Result := InstallLocation;
           Exit;
         end;
       end;
@@ -202,7 +218,6 @@ function GetWandPathAuto: string;
 var
   Candidates: TArrayOfString;
   I: Integer;
-  Resolved: string;
 begin
   Result := '';
 
@@ -223,10 +238,9 @@ begin
 
   for I := 0 to GetArrayLength(Candidates) - 1 do
   begin
-    Resolved := ResolveWandPath(Candidates[I]);
-    if Resolved <> '' then
+    if IsWandRootFolder(Candidates[I]) then
     begin
-      Result := Resolved;
+      Result := Candidates[I];
       Exit;
     end;
   end;
@@ -251,6 +265,8 @@ begin
       False, '');
     WandPathPage.Add('');
     WandPathPage.Values[0] := ExpandConstant('{localappdata}') + '\WeMod';
+    WandPathPage.Buttons[0].Caption := 'WeMod/Wand folder';
+    WandPathPage.Edits[0].ReadOnly := False;
   end
   else
   begin
@@ -259,45 +275,34 @@ begin
 end;
 
 function GetWandPath(Param: string): string;
-var
-  SelectedPath, ResolvedPath: string;
 begin
+  // Return the root WeMod/Wand folder. The application resolves it to the
+  // latest app-* payload subfolder internally.
   if DetectedWandPath <> '' then
     Result := DetectedWandPath
   else if (WandPathPage <> nil) and (WandPathPage.Values[0] <> '') then
-  begin
-    SelectedPath := WandPathPage.Values[0];
-    ResolvedPath := ResolveWandPath(SelectedPath);
-    if ResolvedPath <> '' then
-      Result := ResolvedPath
-    else
-      Result := SelectedPath;
-  end
+    Result := WandPathPage.Values[0]
   else
     Result := '';
 end;
 
 function ShouldEnableAutoPatch: Boolean;
 var
-  Path, ResolvedPath: string;
+  Path: string;
 begin
   Result := WizardIsTaskSelected('autopatch');
   if not Result then Exit;
 
   Path := GetWandPath('');
-  ResolvedPath := ResolveWandPath(Path);
-  if ResolvedPath <> '' then
-    Path := ResolvedPath;
-
   if Path = '' then
   begin
     Result := False;
     Exit;
   end;
 
-  if not LooksLikeWandPath(Path) then
+  if not IsWandRootFolder(Path) then
   begin
-    MsgBox('The selected Wand folder is missing Wand.exe, resources or app.asar. Auto-patch will not be enabled.', mbError, MB_OK);
+    MsgBox('The selected Wand folder is missing Wand.exe or a valid app-* payload subfolder. Auto-patch will not be enabled.', mbError, MB_OK);
     Result := False;
   end;
 end;
@@ -308,10 +313,10 @@ begin
 
   if (WandPathPage <> nil) and (CurPageID = WandPathPage.ID) then
   begin
-    if ResolveWandPath(WandPathPage.Values[0]) = '' then
+    if not IsWandRootFolder(WandPathPage.Values[0]) then
     begin
-      MsgBox('Please select a valid Wand installation folder containing Wand.exe, resources and app.asar.' + #13#10 +
-             'If Wand is installed under a versioned subfolder (e.g. app-12.43.1), select the parent WeMod folder.', mbError, MB_OK);
+      MsgBox('Please select the WeMod/Wand folder that contains Wand.exe.' + #13#10 +
+             'If the actual files are in a versioned subfolder (e.g. app-12.43.1), select the parent WeMod folder and the installer will pick the latest version.', mbError, MB_OK);
       Result := False;
     end;
   end;

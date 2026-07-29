@@ -49,7 +49,7 @@ namespace WandEnhancer.View.AutoPatch
                     var locator = new WeModLocator(PathExtensions.CheckWeModPath, allowManualFallback: false);
                     var info = locator.LocateAsync().GetAwaiter().GetResult();
                     if (info != null)
-                        WeModPath = info.BasePath;
+                        WeModPath = info.RootPath ?? info.BasePath;
                 }
                 catch
                 {
@@ -64,7 +64,9 @@ namespace WandEnhancer.View.AutoPatch
 
         private bool CanEnable()
         {
-            return !string.IsNullOrWhiteSpace(WeModPath) && PathExtensions.CheckWeModPath(WeModPath);
+            return !string.IsNullOrWhiteSpace(WeModPath) &&
+                   (PathExtensions.CheckWeModPath(WeModPath) ||
+                    PathExtensions.ResolveWeModPayloadPath(WeModPath) != null);
         }
 
         private void OnPickPath()

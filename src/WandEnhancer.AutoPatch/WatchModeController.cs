@@ -84,7 +84,10 @@ namespace WandEnhancer.AutoPatch
                     return;
                 }
 
-                _watcher = new FileSystemWatcher(info.BasePath)
+                // Watch the root folder so WeMod updates that create a new app-*
+                // subfolder are detected.
+                var watchPath = info.RootPath ?? info.BasePath;
+                _watcher = new FileSystemWatcher(watchPath)
                 {
                     IncludeSubdirectories = true,
                     NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName
@@ -100,7 +103,7 @@ namespace WandEnhancer.AutoPatch
                     _watcher.EnableRaisingEvents = _enabled;
                 }
 
-                _logger.Info($"Watcher started for {info.BasePath}");
+                _logger.Info($"Watcher started for {watchPath}");
 
                 try
                 {

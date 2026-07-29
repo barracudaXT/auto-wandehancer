@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using WandEnhancer.Core.Services;
@@ -35,10 +36,17 @@ namespace WandEnhancer.AutoPatch
                 return;
             }
 
-            var startInfo = new ProcessStartInfo(info.ExecutablePath)
+            // Launch the root stub when available (WeMod uses a launcher in the
+            // parent folder that delegates to the latest app-* payload folder).
+            var launchPath = File.Exists(Path.Combine(info.RootPath ?? info.BasePath, "Wand.exe"))
+                ? Path.Combine(info.RootPath ?? info.BasePath, "Wand.exe")
+                : info.ExecutablePath;
+            var workingDirectory = info.RootPath ?? info.BasePath;
+
+            var startInfo = new ProcessStartInfo(launchPath)
             {
                 UseShellExecute = true,
-                WorkingDirectory = info.BasePath
+                WorkingDirectory = workingDirectory
             };
             if (wandArgs != null && wandArgs.Length > 0)
             {

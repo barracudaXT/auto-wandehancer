@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using WandEnhancer.Core.Extensions;
 using WandEnhancer.Core.Models;
 
 namespace WandEnhancer.Core.Services
@@ -32,6 +33,7 @@ namespace WandEnhancer.Core.Services
             {
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Wand"),
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Wand"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WeMod"),
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Wand"),
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Wand"),
             };
@@ -59,13 +61,22 @@ namespace WandEnhancer.Core.Services
 
         private WeModInfo TryBuildInfo(string basePath)
         {
-            if (!_pathValidator(basePath)) return null;
-            var exePath = Path.Combine(basePath, "Wand.exe");
+            if (string.IsNullOrWhiteSpace(basePath)) return null;
+            if (!Directory.Exists(basePath)) return null;
+
+            // Accept a WeMod "root" folder that only has a stub Wand.exe, and resolve
+            // it to the latest versioned app-* payload subfolder.
+            var resolvedPath = PathExtensions.ResolveWeModPayloadPath(basePath);
+            if (string.IsNullOrWhiteSpace(resolvedPath)) return null;
+
+            if (!_pathValidator(resolvedPath)) return null;
+            var exePath = Path.Combine(resolvedPath, "Wand.exe");
             if (!File.Exists(exePath)) return null;
 
             return new WeModInfo
             {
-                BasePath = basePath,
+                BasePath = resolvedPath,
+                RootPath = basePath,
                 ExecutablePath = exePath,
                 Version = FileVersionInfo.GetVersionInfo(exePath).FileVersion
             };
@@ -95,7 +106,7 @@ namespace WandEnhancer.Core.Services
         {
             return Task.Run(() =>
             {
-                using (var dialog = new FolderBrowserDialog { Description = "Select your Wand installation folder" })
+                using (var dialog = new FolderBrowserDialog { Description = "Select your WeMod/Wand folder (or the parent app-* folder)" })
                 {
                     if (dialog.ShowDialog() == DialogResult.OK)
                     {
