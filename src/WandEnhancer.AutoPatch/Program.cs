@@ -29,7 +29,6 @@ namespace WandEnhancer.AutoPatch
             var locator = new WeModLocator(WandEnhancer.Core.Extensions.PathExtensions.CheckWeModPath);
             var processManager = new ProcessManager(logger);
             var patcher = new Patcher(patchLogger);
-            var patchController = new PatchModeController(settingsStore, locator, processManager, patcher, logger);
 
             if (string.IsNullOrEmpty(arguments.Mode))
             {
@@ -40,38 +39,40 @@ namespace WandEnhancer.AutoPatch
             switch (arguments.Mode)
             {
                 case "patch":
-                    RunPatchMode(patchController, arguments.WeModPath, logger).GetAwaiter().GetResult();
+                    RunPatchMode(settingsStore, locator, processManager, patcher, logger, arguments.WeModPath).GetAwaiter().GetResult();
                     break;
                 case "launch":
-                    RunLaunchMode(patchController, arguments.WeModPath, GetWandArgs(args), logger).GetAwaiter().GetResult();
+                    RunLaunchMode(settingsStore, locator, processManager, patcher, logger, arguments.WeModPath, GetWandArgs(args)).GetAwaiter().GetResult();
                     break;
                 case "watch":
-                    RunWatchMode(patchController, arguments.WeModPath, logger);
+                    RunWatchMode(settingsStore, locator, processManager, patcher, logger, arguments.WeModPath);
                     break;
             }
         }
 
-        private static async Task RunPatchMode(PatchModeController controller, string path, ILogger logger)
+        private static async Task RunPatchMode(ISettingsStore settingsStore, IWeModLocator locator, IProcessManager processManager, IPatcher patcher, ILogger logger, string path)
         {
+            using (var notification = new NotificationService())
             using (var window = new ProgressWindow())
             using (var retrySignal = new SemaphoreSlim(0, 1))
             {
+                var patchController = new PatchModeController(settingsStore, locator, processManager, patcher, logger, notification);
                 var retryLock = new object();
                 var retryRequested = false;
                 var stop = false;
                 var openMainInvoked = false;
                 var doneTcs = new TaskCompletionSource<object>();
 
-                void WakeRetrySignal()
+                Action wakeRetrySignal = () =>
                 {
                     try { retrySignal.Release(); } catch (SemaphoreFullException) { }
-                }
+                };
 
                 window.FormClosed += (s, e) =>
                 {
                     stop = true;
                     doneTcs.TrySetResult(null);
-                    WakeRetrySignal();
+                    wakeRetrySignal();
                 };
 
                 window.OpenMainRequested += (s, e) =>
@@ -91,7 +92,7 @@ namespace WandEnhancer.AutoPatch
                     stop = true;
                     doneTcs.TrySetResult(null);
                     window.SafeClose();
-                    WakeRetrySignal();
+                    wakeRetrySignal();
                 };
 
                 window.RetryRequested += (s, e) =>
@@ -106,7 +107,8 @@ namespace WandEnhancer.AutoPatch
 
                 retrySignal.Release(); // initial attempt
 
-                _ = Task.Run(async () =>
+#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
+                Task.Run(async () =>
                 {
                     while (!stop)
                     {
@@ -119,7 +121,7 @@ namespace WandEnhancer.AutoPatch
 
                         try
                         {
-                            var success = await controller.RunAsync(path, new Progress<string>(m => window.SetStatus(m)), window);
+                            var success = await patchController.RunAsync(path, new Progress<string>(m => window.SetStatus(m)), window);
                             if (success || stop)
                                 break;
                         }
@@ -145,35 +147,40 @@ namespace WandEnhancer.AutoPatch
 
                     doneTcs.TrySetResult(null);
                 });
+#pragma warning restore CS4014
 
                 window.ShowDialog();
                 await doneTcs.Task;
             }
         }
 
-        private static async Task RunLaunchMode(PatchModeController controller, string path, string[] wandArgs, ILogger logger)
+        private static async Task RunLaunchMode(ISettingsStore settingsStore, IWeModLocator locator, IProcessManager processManager, IPatcher patcher, ILogger logger, string path, string[] wandArgs)
         {
+            using (var notification = new NotificationService())
             using (var window = new ProgressWindow())
             {
-                var launchController = new LaunchModeController(controller, logger);
+                var patchController = new PatchModeController(settingsStore, locator, processManager, patcher, logger, notification);
+                var launchController = new LaunchModeController(patchController, logger);
                 var t = launchController.RunAsync(path, wandArgs, window);
                 window.ShowDialog();
                 await t;
             }
         }
 
-        private static void RunWatchMode(PatchModeController controller, string path, ILogger logger)
+        private static void RunWatchMode(ISettingsStore settingsStore, IWeModLocator locator, IProcessManager processManager, IPatcher patcher, ILogger logger, string path)
         {
             using (var cts = new CancellationTokenSource())
-            using (var watchController = new WatchModeController(controller, logger))
+            using (var notification = new NotificationService())
             {
+                var patchController = new PatchModeController(settingsStore, locator, processManager, patcher, logger, notification);
+                var watchController = new WatchModeController(patchController, logger, notification);
                 var tray = new TrayAgent();
 
                 tray.PatchNowClicked += async (s, e) =>
                 {
                     try
                     {
-                        await controller.RunAsync(path, null, null);
+                        await patchController.RunAsync(path, null, null);
                     }
                     catch (Exception ex)
                     {

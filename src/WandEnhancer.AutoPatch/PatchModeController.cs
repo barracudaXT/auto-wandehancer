@@ -13,6 +13,7 @@ namespace WandEnhancer.AutoPatch
         private readonly IProcessManager _processManager;
         private readonly IPatcher _patcher;
         private readonly ILogger _logger;
+        private readonly INotificationService _notification;
 
         public PatchModeController(
             ISettingsStore settingsStore,
@@ -20,12 +21,24 @@ namespace WandEnhancer.AutoPatch
             IProcessManager processManager,
             IPatcher patcher,
             ILogger logger)
+            : this(settingsStore, locator, processManager, patcher, logger, null)
+        {
+        }
+
+        public PatchModeController(
+            ISettingsStore settingsStore,
+            IWeModLocator locator,
+            IProcessManager processManager,
+            IPatcher patcher,
+            ILogger logger,
+            INotificationService notification)
         {
             _settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
             _locator = locator ?? throw new ArgumentNullException(nameof(locator));
             _processManager = processManager ?? throw new ArgumentNullException(nameof(processManager));
             _patcher = patcher ?? throw new ArgumentNullException(nameof(patcher));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _notification = notification;
         }
 
         public async Task<bool> RunAsync(string configuredPath, IProgress<string> progress, ProgressWindow window = null)
@@ -66,6 +79,7 @@ namespace WandEnhancer.AutoPatch
                 _logger.Error($"Auto-patch failed: {ex}");
                 progress?.Report($"Patch failed: {ex.Message}");
                 window?.ShowFailure($"Patch failed: {ex.Message}");
+                _notification?.ShowError("WandEnhancer", $"Patch failed: {ex.Message}");
                 return false;
             }
         }

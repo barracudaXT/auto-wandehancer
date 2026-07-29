@@ -10,6 +10,7 @@ namespace WandEnhancer.AutoPatch
     {
         private readonly PatchModeController _patchController;
         private readonly ILogger _logger;
+        private readonly INotificationService _notification;
         private readonly SemaphoreSlim _patchSemaphore = new SemaphoreSlim(1, 1);
         private readonly object _watcherLock = new object();
         private readonly TimeSpan _debounceInterval = TimeSpan.FromSeconds(5);
@@ -37,9 +38,15 @@ namespace WandEnhancer.AutoPatch
         }
 
         public WatchModeController(PatchModeController patchController, ILogger logger)
+            : this(patchController, logger, new NotificationService())
+        {
+        }
+
+        public WatchModeController(PatchModeController patchController, ILogger logger, INotificationService notification)
         {
             _patchController = patchController ?? throw new ArgumentNullException(nameof(patchController));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _notification = notification ?? throw new ArgumentNullException(nameof(notification));
         }
 
         public void Dispose()
@@ -156,7 +163,15 @@ namespace WandEnhancer.AutoPatch
                 {
                     _logger.Info($"Detected change: {e.FullPath}");
                     await Task.Delay(_debounceInterval, token).ConfigureAwait(false);
-                    await _patchController.RunAsync(null, null, null).ConfigureAwait(false);
+                    var success = await _patchController.RunAsync(null, null, null).ConfigureAwait(false);
+                    if (success)
+                    {
+                        _notification.ShowInfo("WandEnhancer", "Wand was re-patched after an update.");
+                    }
+                    else
+                    {
+                        _notification.ShowWarning("WandEnhancer", "Auto-patch failed. Open WandEnhancer for details.");
+                    }
                 }
                 finally
                 {
@@ -170,6 +185,7 @@ namespace WandEnhancer.AutoPatch
             catch (Exception ex)
             {
                 _logger.Error($"Watcher patch handler failed: {ex}");
+                _notification.ShowError("WandEnhancer", $"Auto-patch error: {ex.Message}");
             }
         }
     }
