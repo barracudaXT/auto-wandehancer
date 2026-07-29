@@ -81,12 +81,12 @@ end;
 function LooksLikeWandPath(Path: string): Boolean;
 begin
   // Keep this in sync with WandEnhancer.Core.Extensions.PathExtensions.CheckWeModPath.
-  // resources may be a file or directory in some Wand builds.
+  // WeMod stores app.asar inside the resources directory.
   Result := (Path <> '') and
             DirExists(Path) and
             FileExists(Path + '\Wand.exe') and
-            (DirExists(Path + '\resources') or FileExists(Path + '\resources')) and
-            FileExists(Path + '\app.asar');
+            DirExists(Path + '\resources') and
+            FileExists(Path + '\resources\app.asar');
 end;
 
 // Parses a dotted version string (e.g. "12.43.1") into a comparable integer.

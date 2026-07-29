@@ -6,14 +6,15 @@ namespace WandEnhancer.Core.Extensions
     public static class PathExtensions
     {
         // Validates a folder that contains the actual Wand payload.
+        // Note: WeMod stores app.asar inside the resources directory, not at the root.
         public static bool CheckWeModPath(string path)
         {
             if (string.IsNullOrWhiteSpace(path)) return false;
             if (!Directory.Exists(path)) return false;
 
-            var requiredFiles = new[] { "Wand.exe", "resources", "app.asar" };
-            return requiredFiles.All(f =>
-                File.Exists(Path.Combine(path, f)) || Directory.Exists(Path.Combine(path, f)));
+            return File.Exists(Path.Combine(path, "Wand.exe")) &&
+                   Directory.Exists(Path.Combine(path, "resources")) &&
+                   File.Exists(Path.Combine(path, "resources", "app.asar"));
         }
 
         // WeMod installs under a versioned app-* subfolder (e.g. app-12.43.1)

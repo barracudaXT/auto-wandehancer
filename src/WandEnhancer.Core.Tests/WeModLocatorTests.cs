@@ -13,7 +13,7 @@ namespace WandEnhancer.Core.Tests
             try
             {
                 LocateAsync_WithConfiguredPath_ReturnsInfo().GetAwaiter().GetResult();
-                LocateAsync_WithInvalidConfiguredPath_ReturnsNull().GetAwaiter().GetResult();
+                LocateAsync_WithInvalidConfiguredPath_FallsBackOrReturnsNull().GetAwaiter().GetResult();
                 SettingsStoreTests.RunAll();
                 ProcessManagerTests.RunAll();
                 Console.WriteLine("All tests passed.");
@@ -42,11 +42,15 @@ namespace WandEnhancer.Core.Tests
             }
         }
 
-        private static async Task LocateAsync_WithInvalidConfiguredPath_ReturnsNull()
+        private static async Task LocateAsync_WithInvalidConfiguredPath_FallsBackOrReturnsNull()
         {
             var locator = new WeModLocator(PathExtensions.CheckWeModPath, allowManualFallback: false);
-            var info = await locator.LocateAsync(@"C:\NonExistent\Wand");
-            if (info != null) throw new Exception("Expected null WeModInfo");
+            // Use a path that is not itself a valid Wand payload. The locator may
+            // still fall back to auto-detecting a real install on this machine.
+            var bogusPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName(), "Wand");
+            var info = await locator.LocateAsync(bogusPath);
+            if (info != null && string.Equals(info.BasePath, bogusPath, StringComparison.OrdinalIgnoreCase))
+                throw new Exception("Locator returned the invalid configured path as a valid install");
         }
 
         private static string CreateFakeWandDir()
@@ -55,7 +59,7 @@ namespace WandEnhancer.Core.Tests
             Directory.CreateDirectory(path);
             File.WriteAllText(Path.Combine(path, "Wand.exe"), "fake");
             Directory.CreateDirectory(Path.Combine(path, "resources"));
-            File.WriteAllText(Path.Combine(path, "app.asar"), "fake");
+            File.WriteAllText(Path.Combine(path, "resources", "app.asar"), "fake");
             return path;
         }
     }

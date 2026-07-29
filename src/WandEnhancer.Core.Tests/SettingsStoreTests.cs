@@ -109,7 +109,7 @@ namespace WandEnhancer.Core.Tests
             Directory.CreateDirectory(path);
             File.WriteAllText(Path.Combine(path, "Wand.exe"), "fake");
             Directory.CreateDirectory(Path.Combine(path, "resources"));
-            File.WriteAllText(Path.Combine(path, "app.asar"), "fake");
+            File.WriteAllText(Path.Combine(path, "resources", "app.asar"), "fake");
             return path;
         }
     }
