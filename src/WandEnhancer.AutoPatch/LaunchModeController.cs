@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading.Tasks;
 using WandEnhancer.Core.Services;
 
@@ -41,10 +42,28 @@ namespace WandEnhancer.AutoPatch
             };
             if (wandArgs != null && wandArgs.Length > 0)
             {
-                startInfo.Arguments = string.Join(" ", wandArgs);
+                startInfo.Arguments = string.Join(" ", wandArgs.Select(EscapeArgument));
             }
-            Process.Start(startInfo);
+
+            try
+            {
+                Process.Start(startInfo);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Failed to start Wand: {ex}");
+                window?.ShowFailure($"Failed to start Wand: {ex.Message}");
+                return;
+            }
+
             window?.SafeClose();
+        }
+
+        private static string EscapeArgument(string arg)
+        {
+            if (string.IsNullOrEmpty(arg) || arg.All(c => !char.IsWhiteSpace(c) && c != '"'))
+                return arg;
+            return "\"" + arg.Replace("\"", "\\\"") + "\"";
         }
     }
 }

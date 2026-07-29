@@ -16,11 +16,13 @@ namespace WandEnhancer.View.Popups
         private const string JavaScriptFileExtension = ".js";
 
         private readonly Action<PatchConfig> _onApply;
+        private readonly PatchConfig _savedConfig;
         private readonly ObservableCollection<SelectedScript> _selectedScripts = new ObservableCollection<SelectedScript>();
 
         public PatchVectorsPopup(Action<PatchConfig> onApply, PatchConfig savedConfig = null)
         {
             _onApply = onApply;
+            _savedConfig = savedConfig;
             InitializeComponent();
             ScriptList.ItemsSource = _selectedScripts;
             RestoreFromConfig(savedConfig);
@@ -120,12 +122,16 @@ namespace WandEnhancer.View.Popups
                 result.Add(EPatchType.RemoteWebPanelPreview);
             }
 
-            _onApply(new PatchConfig
+            var newConfig = _savedConfig != null ? new PatchConfig
             {
-                PatchTypes = result,
-                CustomScriptPaths = _selectedScripts.Select(script => script.FullPath).ToList(),
-                AutoApplyPatches = false
-            });
+                Path = _savedConfig.Path,
+                AutoApplyPatches = _savedConfig.AutoApplyPatches
+            } : new PatchConfig();
+
+            newConfig.PatchTypes = result;
+            newConfig.CustomScriptPaths = _selectedScripts.Select(script => script.FullPath).ToList();
+
+            _onApply(newConfig);
         }
 
         private void AddScript(string path)

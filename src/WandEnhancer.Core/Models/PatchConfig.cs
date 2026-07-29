@@ -18,7 +18,7 @@ namespace WandEnhancer.Core.Models
     {
         private string _path;
 
-        public HashSet<EPatchType> PatchTypes { get; set; }
+        public HashSet<EPatchType> PatchTypes { get; set; } = new HashSet<EPatchType>();
 
         public List<string> CustomScriptPaths { get; set; } = new List<string>();
 
@@ -32,9 +32,15 @@ namespace WandEnhancer.Core.Models
             get => _path;
             set
             {
-                _path = value;
-                if (!PathExtensions.CheckWeModPath(_path))
+                if (value != null && !PathExtensions.CheckWeModPath(value))
                     throw new Exception("Invalid WeMod path");
+
+                _path = value;
+                if (_path == null)
+                {
+                    AppProps = null;
+                    return;
+                }
 
                 AppProps = new WeModConfig
                 {

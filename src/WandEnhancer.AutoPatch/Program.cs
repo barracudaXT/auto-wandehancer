@@ -26,7 +26,7 @@ namespace WandEnhancer.AutoPatch
             var logger = new FileLogger(logDirectory);
             var patchLogger = new Action<string, ELogType>((msg, type) => logger.Info(msg));
             var settingsStore = new SettingsStore(settingsPath);
-            var locator = new WeModLocator(WandEnhancer.Core.Extensions.PathExtensions.CheckWeModPath);
+            var locator = new WeModLocator(WandEnhancer.Core.Extensions.PathExtensions.CheckWeModPath, allowManualFallback: false);
             var processManager = new ProcessManager(logger);
             var patcher = new Patcher(patchLogger);
 
@@ -61,6 +61,7 @@ namespace WandEnhancer.AutoPatch
                 var retryRequested = false;
                 var stop = false;
                 var openMainInvoked = false;
+                var attemptCount = 0;
                 var doneTcs = new TaskCompletionSource<object>();
 
                 Action wakeRetrySignal = () =>
@@ -119,6 +120,13 @@ namespace WandEnhancer.AutoPatch
                             retryRequested = false;
                         }
 
+                        attemptCount++;
+                        if (attemptCount > 3)
+                        {
+                            logger.Error("Maximum auto-patch retry attempts exceeded.");
+                            break;
+                        }
+
                         try
                         {
                             var success = await patchController.RunAsync(path, new Progress<string>(m => window.SetStatus(m)), window);
@@ -161,6 +169,19 @@ namespace WandEnhancer.AutoPatch
             {
                 var patchController = new PatchModeController(settingsStore, locator, processManager, patcher, logger, notification);
                 var launchController = new LaunchModeController(patchController, logger);
+
+                window.RetryRequested += (s, e) =>
+                {
+                    window.SetStatus("Retrying patch...");
+                    _ = Task.Run(async () => await launchController.RunAsync(path, wandArgs, window));
+                };
+
+                window.OpenMainRequested += (s, e) =>
+                {
+                    OpenMainApplication();
+                    window.SafeClose();
+                };
+
                 var t = launchController.RunAsync(path, wandArgs, window);
                 window.ShowDialog();
                 await t;
@@ -173,40 +194,64 @@ namespace WandEnhancer.AutoPatch
             using (var notification = new NotificationService())
             {
                 var patchController = new PatchModeController(settingsStore, locator, processManager, patcher, logger, notification);
-                var watchController = new WatchModeController(patchController, logger, notification);
                 var tray = new TrayAgent();
+                Task watchTask = null;
 
-                tray.PatchNowClicked += async (s, e) =>
+                using (var watchController = new WatchModeController(patchController, logger, notification))
                 {
-                    try
+                    tray.PatchNowClicked += (s, e) =>
                     {
-                        await patchController.RunAsync(path, null, null);
-                    }
-                    catch (Exception ex)
+                        Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await patchController.RunAsync(path, null, null);
+                            }
+                            catch (Exception ex)
+                            {
+                                logger.Error($"Patch now failed: {ex}");
+                            }
+                        });
+                    };
+                    tray.OpenSettingsClicked += (s, e) => OpenMainApplication();
+                    tray.ExitClicked += (s, e) =>
                     {
-                        logger.Error($"Patch now failed: {ex}");
-                    }
-                };
-                tray.OpenSettingsClicked += (s, e) => OpenMainApplication();
-                tray.ExitClicked += (s, e) =>
-                {
-                    cts.Cancel();
-                    Application.Exit();
-                };
-                tray.WatcherEnabledChanged += (s, e) => watchController.Enabled = tray.WatcherEnabled;
+                        cts.Cancel();
+                        Application.Exit();
+                    };
+                    tray.WatcherEnabledChanged += (s, e) => watchController.Enabled = tray.WatcherEnabled;
 
-                var task = watchController.RunAsync(path, cts.Token);
-                Application.Run(tray);
-                try { task.Wait(TimeSpan.FromSeconds(5)); } catch { }
+                    watchTask = watchController.RunAsync(path, cts.Token);
+                    Application.Run(tray);
+                }
+
+                try { watchTask?.Wait(TimeSpan.FromSeconds(5)); } catch { }
             }
         }
 
         private static void OpenMainApplication()
         {
-            var exePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "WandEnhancer.exe");
-            if (File.Exists(exePath))
+            var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            var candidates = new[]
             {
-                Process.Start(exePath);
+                Path.Combine(baseDir, "WandEnhancer.exe"),
+                Path.Combine(Directory.GetParent(baseDir).FullName, "WandEnhancer.exe")
+            };
+
+            foreach (var exePath in candidates)
+            {
+                if (File.Exists(exePath))
+                {
+                    try
+                    {
+                        Process.Start(exePath);
+                    }
+                    catch (Exception)
+                    {
+                        // Best effort.
+                    }
+                    return;
+                }
             }
         }
 
