@@ -41,6 +41,7 @@
         <StartupObject>WandEnhancer.Program</StartupObject>
     </PropertyGroup>
     <ItemGroup>
+        <Reference Include="Microsoft.CSharp" />
         <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
           <HintPath>..\packages\Newtonsoft.Json.13.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
         </Reference>
@@ -74,6 +75,11 @@
         <Compile Include="Utils\Common.cs" />
         <Compile Include="Utils\Extensions.cs" />
         <Compile Include="Utils\Win32\Shortcut.cs" />
+        <Compile Include="Services\ElevationHelper.cs" />
+        <Compile Include="Services\IScheduledTaskRegistrar.cs" />
+        <Compile Include="Services\ScheduledTaskRegistrar.cs" />
+        <Compile Include="Services\IShortcutRegistrar.cs" />
+        <Compile Include="Services\ShortcutRegistrar.cs" />
         <Compile Include="View\Controls\InfoItem.xaml.cs">
           <DependentUpon>InfoItem.xaml</DependentUpon>
         </Compile>
@@ -81,6 +87,10 @@
         <Compile Include="View\MainWindow\Logs.cs" />
         <Compile Include="View\MainWindow\MainWindow.xaml.cs" />
         <Compile Include="View\MainWindow\MainWindowVm.cs" />
+        <Compile Include="View\AutoPatch\AutoPatchSetupVm.cs" />
+        <Compile Include="View\AutoPatch\AutoPatchSetupView.xaml.cs">
+          <DependentUpon>AutoPatchSetupView.xaml</DependentUpon>
+        </Compile>
         <Compile Include="View\Popups\PatchVectorsPopup.xaml.cs">
           <DependentUpon>PatchVectorsPopup.xaml</DependentUpon>
         </Compile>
@@ -109,6 +119,7 @@
         <Page Include="View\Controls\InfoItem.xaml" />
         <Page Include="View\Controls\PopupHost.xaml" />
         <Page Include="View\MainWindow\MainWindow.xaml" />
+        <Page Include="View\AutoPatch\AutoPatchSetupView.xaml" />
         <Page Include="View\Popups\PatchVectorsPopup.xaml" />
         <Page Include="View\Popups\SettingsPopup.xaml" />
     </ItemGroup>
@@ -145,6 +156,10 @@
         <Project>{CC5D9EE5-9989-4766-A9CF-28E8F0533B11}</Project>
         <Name>WandEnhancer.Core</Name>
       </ProjectReference>
+      <ProjectReference Include="..\WandEnhancer.AutoPatch\WandEnhancer.AutoPatch.csproj">
+        <Project>{B7B50B81-AD29-453A-926E-85888504B604}</Project>
+        <Name>WandEnhancer.AutoPatch</Name>
+      </ProjectReference>
     </ItemGroup>
     <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
     <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
@@ -171,5 +186,13 @@
         <Delete Files="$(OutputPath)$(AssemblyName).pdb" ContinueOnError="true" />
         <Exec Command="&quot;$(ILRepackExe)&quot; /allowMultiple /copyattrs /out:&quot;$(OutputPath)$(AssemblyName).exe&quot; &quot;$(MainAssembly)&quot; $(DllList)" />
         <Delete Files="@(AssemblyList)" ContinueOnError="true" />
+    </Target>
+
+    <Target Name="CopyAutoPatchOutput" AfterTargets="Build">
+        <ItemGroup>
+            <AutoPatchOutput Include="..\WandEnhancer.AutoPatch\bin\$(Configuration)\*.*" />
+        </ItemGroup>
+        <MakeDir Directories="$(OutputPath)AutoPatch\" />
+        <Copy SourceFiles="@(AutoPatchOutput)" DestinationFolder="$(OutputPath)AutoPatch\" SkipUnchangedFiles="true" />
     </Target>
 </Project>

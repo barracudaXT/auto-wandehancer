@@ -52,6 +52,14 @@
                         Margin="0 0 5 0"
                         Width="25" Height="25" Padding="5.5"
                         Style="{StaticResource IconButton}"
+                        Tag="{StaticResource ShieldIcon}"
+                        ToolTip="Auto-patch setup"
+                        Click="OpenAutoPatchSetupClicked"
+                        />
+                    <Button
+                        Margin="0 0 5 0"
+                        Width="25" Height="25" Padding="5.5"
+                        Style="{StaticResource IconButton}"
                         Tag="{StaticResource CogIcon}"
                         Command="{Binding OpenSettingsCommand}"
                         />

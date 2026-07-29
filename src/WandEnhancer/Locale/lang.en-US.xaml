@@ -38,4 +38,11 @@
     <s:String x:Key="pv_popup_title">What are we gonna enhance?</s:String>
     <!--#endregion -->
 
+    <!--#region AutoPatchSetup -->
+    <s:String x:Key="autopatch_title">Auto-patch setup</s:String>
+    <s:String x:Key="autopatch_pick">Pick</s:String>
+    <s:String x:Key="autopatch_enable">Enable</s:String>
+    <s:String x:Key="autopatch_disable">Disable</s:String>
+    <!--#endregion -->
+
 </ResourceDictionary>

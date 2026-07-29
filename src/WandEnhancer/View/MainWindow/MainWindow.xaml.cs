@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Windows;
 using System.Windows.Input;
-using System.Windows.Media;
+using WandEnhancer.View.AutoPatch;
 
 namespace WandEnhancer.View.MainWindow
 {
@@ -12,7 +12,7 @@ namespace WandEnhancer.View.MainWindow
     {
         public static MainWindow Instance;
         public readonly MainWindowVm ViewModel;
-        
+
         public MainWindow()
         {
             InitializeComponent();
@@ -22,7 +22,7 @@ namespace WandEnhancer.View.MainWindow
             Instance = this;
 
         }
-        
+
         public void OpenPopup(FrameworkElement content, string title = null)
         {
             this.PopupHost.PopupContent = content;
@@ -48,6 +48,12 @@ namespace WandEnhancer.View.MainWindow
         private void OpenSourceClicked(object sender, MouseButtonEventArgs e)
         {
             System.Diagnostics.Process.Start(Constants.RepositoryUrl);
+        }
+
+        private void OpenAutoPatchSetupClicked(object sender, RoutedEventArgs e)
+        {
+            var title = Application.Current.FindResource("autopatch_title") as string;
+            OpenPopup(new AutoPatchSetupView(), title);
         }
     }
 }

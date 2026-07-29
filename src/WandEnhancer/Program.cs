@@ -1,7 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using WandEnhancer.Core.Extensions;
+using WandEnhancer.Core.Services;
+using WandEnhancer.Services;
 using WandEnhancer.View.MainWindow;
 
 namespace WandEnhancer
@@ -13,11 +17,12 @@ namespace WandEnhancer
         {
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
             TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
-            
+
             List<LogEntry> logEntries = new List<LogEntry>();
             if (args.Length > 0)
             {
-                // TODO: Command line arguments handling
+                if (TryHandleCommandLine(args))
+                    return;
             }
 
             var application = new App();
@@ -29,8 +34,53 @@ namespace WandEnhancer
             }
             application.Run();
         }
-        
-        
+
+        private static bool TryHandleCommandLine(string[] args)
+        {
+            try
+            {
+                if (args.Length >= 2 && string.Equals(args[0], "--enable-autopatch", StringComparison.OrdinalIgnoreCase))
+                {
+                    var wandPath = args[1].Trim('\"');
+                    if (!PathExtensions.CheckWeModPath(wandPath))
+                    {
+                        MessageBox.Show($"The selected folder is not a valid Wand directory:\n{wandPath}", "WandEnhancer");
+                        Environment.Exit(1);
+                        return true;
+                    }
+
+                    var autoPatchPath = GetAutoPatchExePath();
+                    new ShortcutRegistrar().Register(wandPath, autoPatchPath);
+                    new ScheduledTaskRegistrar().Create(wandPath, autoPatchPath);
+                    MessageBox.Show("Auto-patch enabled successfully.", "WandEnhancer");
+                    Environment.Exit(0);
+                    return true;
+                }
+
+                if (string.Equals(args[0], "--disable-autopatch", StringComparison.OrdinalIgnoreCase))
+                {
+                    new ShortcutRegistrar().Unregister();
+                    new ScheduledTaskRegistrar().Delete();
+                    MessageBox.Show("Auto-patch disabled successfully.", "WandEnhancer");
+                    Environment.Exit(0);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Command failed: {ex.Message}", "WandEnhancer");
+                Environment.Exit(1);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static string GetAutoPatchExePath()
+        {
+            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "AutoPatch", "WandEnhancer.AutoPatch.exe");
+        }
+
         private static void OnUnobservedTaskException(object sender, UnobservedTaskExceptionEventArgs e)
         {
             MessageBox.Show(e.Exception.ToString());
