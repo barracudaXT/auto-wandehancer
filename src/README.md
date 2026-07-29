@@ -24,6 +24,7 @@ The .NET patcher modifies files in the selected local Wand installation and does
 ✅ Advanced layout and theme customization (Client-side only) <br/>
 ✅ AI Features <br/>
 ✅ Remote web panel (Remote Connect on mobile) <br/>
+✅ Automatic re-patching after Wand updates <br/>
 
 ## 🌐 Remote Web Panel
 WandEnhancer includes a built-in **Remote Web Panel** allowing you to control app features directly from your phone.
@@ -56,6 +57,34 @@ This repository does not publish official compiled binaries. Build your own exec
 https://github.com/user-attachments/assets/7966cabe-0aa6-424d-8c2f-981ad91e0f91
 
 
+
+## 🔄 Auto-Patch
+
+WandEnhancer can automatically keep Wand patched after updates and ensure every Wand launch is patched first.
+
+### How it works
+
+- A lightweight helper, `WandEnhancer.AutoPatch.exe`, runs in three modes:
+  - `--patch` – kills Wand, applies the patch, and exits.
+  - `--launch` – kills Wand, applies the patch, then starts the real `Wand.exe`.
+  - `--watch` – watches the Wand install directory and re-patches after updates.
+- The same patch settings selected in the main WandEnhancer UI are reused automatically.
+
+### Enabling auto-patch
+
+1. Build the project and run `WandEnhancer.exe`.
+2. Click the **shield icon** in the top-right corner to open **Auto-patch setup**.
+3. Confirm or pick the Wand installation directory.
+4. Click **Enable**. You will be prompted for administrator rights once.
+5. WandEnhancer replaces the Wand shortcut target with `WandEnhancer.AutoPatch.exe --launch`, creates an elevated scheduled task that runs `--watch` at logon, and performs an initial patch.
+
+### Disabling auto-patch
+
+1. Open **Auto-patch setup** from the shield icon.
+2. Click **Disable** and confirm the UAC prompt.
+3. The original Wand shortcut is restored and the watcher task is removed.
+
+> Auto-patch requires administrator elevation once during setup. The watcher task runs elevated so it can terminate Wand processes and modify the Wand install directory without repeated UAC prompts.
 
 ## 🧩 Custom scripts
 
