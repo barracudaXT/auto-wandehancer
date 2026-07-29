@@ -57,5 +57,19 @@ namespace WandEnhancer.Utils.Win32
                 shortcut.IconLocation = iconPath;
             shortcut.Save();
         }
+
+        public static ShortcutParams LoadShortcut(string fileName)
+        {
+            IWshShortcut shortcut = (IWshShortcut)m_type.InvokeMember("CreateShortcut", System.Reflection.BindingFlags.InvokeMethod, null, m_shell, new object[] { fileName });
+            return new ShortcutParams
+            {
+                FileName = fileName,
+                TargetPath = shortcut.TargetPath,
+                Arguments = shortcut.Arguments,
+                WorkingDirectory = shortcut.WorkingDirectory,
+                Description = shortcut.Description,
+                IconPath = shortcut.IconLocation
+            };
+        }
     }
 }
