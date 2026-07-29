@@ -12,12 +12,13 @@
 
 - Target framework is `.NET Framework 4.8`.
 - Platform target is `x64`.
-- The project must build with the existing `build.ps1` pipeline.
+- The project must build with the existing `build.ps1` pipeline. `cmake` must be on PATH; if it is not, prepend `C:\Program Files\CMake\bin` to PATH for the build session.
 - Admin elevation is required once during setup.
 - No network requests; all operations are local.
 - Auto-patch reuses the same patch settings as the main UI (`appsettings.json`).
 - All Wand processes must be terminated before patching.
 - The helper must show a compact progress window during auto-patching.
+- The test project uses a console runner because MSTest is not present in this environment; tests must still be runnable and pass.
 
 ---
 
@@ -123,10 +124,12 @@ Use this exact signature in later tasks. `WeModConfig` is the Wand installation 
 
 - [ ] **Step 4: Commit baseline marker**
 
+Create `src/BUILD_BASELINE.md` with the verified upstream commit SHA and the exact patcher signatures. Then commit it:
+
 ```bash
 cd "C:/App-Projects/auto-wandehancer/src"
-git add docs/superpowers/plans/2026-07-29-auto-patch-wand-enhancer.md
-git commit -m "docs: add auto-patch implementation plan"
+git add BUILD_BASELINE.md
+git commit -m "docs: record auto-patch baseline"
 ```
 
 ## Task 2: Create the Shared Class Library `WandEnhancer.Core`
