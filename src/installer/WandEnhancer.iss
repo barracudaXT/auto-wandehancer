@@ -69,13 +69,23 @@ begin
     Result := Release >= 528372;
 end;
 
+function NormalizePath(const Path: string): string;
+begin
+  Result := Path;
+  if Result = '' then Exit;
+  // Remove trailing backslash unless this is a drive root like C:\
+  while (Length(Result) > 1) and (Result[Length(Result)] = '\') do
+    SetLength(Result, Length(Result) - 1);
+end;
+
 function LooksLikeWandPath(Path: string): Boolean;
 begin
   // Keep this in sync with WandEnhancer.Core.Extensions.PathExtensions.CheckWeModPath.
+  // resources may be a file or directory in some Wand builds.
   Result := (Path <> '') and
             DirExists(Path) and
             FileExists(Path + '\Wand.exe') and
-            DirExists(Path + '\resources') and
+            (DirExists(Path + '\resources') or FileExists(Path + '\resources')) and
             FileExists(Path + '\app.asar');
 end;
 
@@ -119,37 +129,36 @@ begin
   end;
 end;
 
-// Returns the latest app-* subfolder under BasePath that looks like a valid
-// Wand payload, or '' if none exists.
-function FindLatestAppSubfolder(BasePath: string): string;
+// Returns the latest app-* subfolder under BasePath, or '' if none exists.
+// Does not validate the subfolder contents.
+function FindLatestAppSubfolderName(BasePath: string): string;
 var
   FindRec: TFindRec;
-  BestPath, Candidate, VersionPart: string;
+  BestName, VersionPart: string;
   BestVersion, CurrentVersion: Int64;
+  SearchPath: string;
 begin
   Result := '';
   if BasePath = '' then Exit;
 
-  BestPath := '';
+  SearchPath := NormalizePath(BasePath) + '\app-*';
+  BestName := '';
   BestVersion := -1;
-  if FindFirst(BasePath + '\app-*', FindRec) then
+
+  if FindFirst(SearchPath, FindRec) then
   begin
     try
       repeat
         if (FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0 then
         begin
-          Candidate := BasePath + '\' + FindRec.Name;
-          if LooksLikeWandPath(Candidate) then
-          begin
-            // FindRec.Name is like "app-12.43.1".
-            VersionPart := Copy(FindRec.Name, 5, Length(FindRec.Name) - 4);
-            CurrentVersion := ParseVersionToInt(VersionPart);
+          // FindRec.Name is like "app-12.43.1".
+          VersionPart := Copy(FindRec.Name, 5, Length(FindRec.Name) - 4);
+          CurrentVersion := ParseVersionToInt(VersionPart);
 
-            if (BestPath = '') or (CurrentVersion > BestVersion) then
-            begin
-              BestPath := Candidate;
-              BestVersion := CurrentVersion;
-            end;
+          if (BestName = '') or (CurrentVersion > BestVersion) then
+          begin
+            BestName := FindRec.Name;
+            BestVersion := CurrentVersion;
           end;
         end;
       until not FindNext(FindRec);
@@ -158,32 +167,83 @@ begin
     end;
   end;
 
-  Result := BestPath;
-end;
-
-// Accepts either a direct Wand payload folder (has Wand.exe + resources +
-// app.asar) or a WeMod "root" folder that contains a Wand.exe stub/launcher
-// and one or more app-* versioned payload subfolders.
-function IsWandRootFolder(Path: string): Boolean;
-begin
-  Result := (Path <> '') and DirExists(Path) and FileExists(Path + '\Wand.exe') and
-            (LooksLikeWandPath(Path) or (FindLatestAppSubfolder(Path) <> ''));
+  Result := BestName;
 end;
 
 // Resolves a user-selected or auto-detected folder to the actual folder that
-// should be patched. For a WeMod root folder this is the latest app-* subfolder.
+// should be patched. Accepts:
+//   - a direct Wand payload folder (has Wand.exe + resources + app.asar)
+//   - a WeMod "root" folder with app-* versioned payload subfolders
+//   - a specific app-* versioned payload subfolder
+// Returns '' if no valid payload can be found.
 function ResolveWandPath(BasePath: string): string;
+var
+  LatestName: string;
+  NormalizedPath: string;
 begin
   Result := '';
   if BasePath = '' then Exit;
 
-  if LooksLikeWandPath(BasePath) then
+  NormalizedPath := NormalizePath(BasePath);
+
+  // Case 1: already a valid payload folder.
+  if LooksLikeWandPath(NormalizedPath) then
   begin
-    Result := BasePath;
+    Result := NormalizedPath;
     Exit;
   end;
 
-  Result := FindLatestAppSubfolder(BasePath);
+  // Case 2: an app-* subfolder was selected directly.
+  if (Pos('\app-', NormalizedPath) > 0) and
+     FileExists(NormalizedPath + '\Wand.exe') then
+  begin
+    Result := NormalizedPath;
+    Exit;
+  end;
+
+  // Case 3: WeMod root with versioned app-* subfolders.
+  LatestName := FindLatestAppSubfolderName(NormalizedPath);
+  if LatestName <> '' then
+  begin
+    Result := NormalizedPath + '\' + LatestName;
+    if not LooksLikeWandPath(Result) then
+      Result := '';
+  end;
+end;
+
+// Accepts either a direct Wand payload folder or a WeMod-style folder.
+// WeMod keeps a launcher stub (Wand.exe) in the root and the real payload
+// in app-* subfolders; accept the root as long as Wand.exe is present.
+function IsWandRootFolder(Path: string): Boolean;
+var
+  NormalizedPath: string;
+begin
+  Result := False;
+  if Path = '' then Exit;
+
+  NormalizedPath := NormalizePath(Path);
+  if not DirExists(NormalizedPath) then Exit;
+
+  // Direct payload folder.
+  if LooksLikeWandPath(NormalizedPath) then
+  begin
+    Result := True;
+    Exit;
+  end;
+
+  // WeMod root with a Wand.exe launcher stub (we will resolve app-* later).
+  if FileExists(NormalizedPath + '\Wand.exe') then
+  begin
+    Result := True;
+    Exit;
+  end;
+
+  // Specific app-* subfolder selected directly.
+  if (Pos('\app-', NormalizedPath) > 0) and FileExists(NormalizedPath + '\Wand.exe') then
+  begin
+    Result := True;
+    Exit;
+  end;
 end;
 
 function TryGetWandPathFromRegistry(RootKey: Integer): string;
