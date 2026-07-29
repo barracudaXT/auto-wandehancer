@@ -79,12 +79,102 @@ begin
             FileExists(Path + '\app.asar');
 end;
 
+// Parses a dotted version string (e.g. "12.43.1") into a comparable integer.
+// Assumes each segment fits in a normal integer; -1 means invalid/unparseable.
+function ParseVersionToInt(const Version: string): Int64;
+var
+  Segment: string;
+  DotPos: Integer;
+  Value, Multiplier: Int64;
+  Remaining: string;
+begin
+  Result := 0;
+  Remaining := Version;
+  Multiplier := 100000000; // enough room for ~4 segments of 4 digits each
+
+  while Remaining <> '' do
+  begin
+    DotPos := Pos('.', Remaining);
+    if DotPos > 0 then
+    begin
+      Segment := Copy(Remaining, 1, DotPos - 1);
+      Remaining := Copy(Remaining, DotPos + 1, Length(Remaining) - DotPos);
+    end
+    else
+    begin
+      Segment := Remaining;
+      Remaining := '';
+    end;
+
+    Value := StrToInt64Def(Segment, -1);
+    if Value < 0 then
+    begin
+      Result := -1;
+      Exit;
+    end;
+
+    Result := Result + (Value * Multiplier);
+    Multiplier := Multiplier div 10000;
+    if Multiplier < 1 then Multiplier := 1;
+  end;
+end;
+
+// Wand/WeMod sometimes installs under a versioned "app-x.y.z" subfolder
+// (e.g. %LocalAppData%\WeMod\app-12.43.1). This resolves the parent path
+// to the actual application folder if possible.
+function ResolveWandPath(BasePath: string): string;
+var
+  FindRec: TFindRec;
+  BestPath, Candidate, VersionPart: string;
+  BestVersion, CurrentVersion: Int64;
+begin
+  Result := '';
+  if BasePath = '' then Exit;
+
+  if LooksLikeWandPath(BasePath) then
+  begin
+    Result := BasePath;
+    Exit;
+  end;
+
+  // Look for app-* subfolders and prefer the numerically highest version.
+  BestPath := '';
+  BestVersion := -1;
+  if FindFirst(BasePath + '\app-*', FindRec) then
+  begin
+    try
+      repeat
+        if (FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0 then
+        begin
+          Candidate := BasePath + '\' + FindRec.Name;
+          if LooksLikeWandPath(Candidate) then
+          begin
+            // FindRec.Name is like "app-12.43.1".
+            VersionPart := Copy(FindRec.Name, 5, Length(FindRec.Name) - 4);
+            CurrentVersion := ParseVersionToInt(VersionPart);
+
+            if (BestPath = '') or (CurrentVersion > BestVersion) then
+            begin
+              BestPath := Candidate;
+              BestVersion := CurrentVersion;
+            end;
+          end;
+        end;
+      until not FindNext(FindRec);
+    finally
+      FindClose(FindRec);
+    end;
+  end;
+
+  Result := BestPath;
+end;
+
 function TryGetWandPathFromRegistry(RootKey: Integer): string;
 var
   UninstallKey: string;
   SubKeyNames: TArrayOfString;
   I: Integer;
-  DisplayName, InstallLocation: string;
+  DisplayName, InstallLocation, ResolvedPath: string;
 begin
   Result := '';
   UninstallKey := 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall';
@@ -95,10 +185,14 @@ begin
       if RegQueryStringValue(RootKey, UninstallKey + '\' + SubKeyNames[I], 'DisplayName', DisplayName) and
          ((Pos('Wand', DisplayName) > 0) or (Pos('WeMod', DisplayName) > 0)) and
          RegQueryStringValue(RootKey, UninstallKey + '\' + SubKeyNames[I], 'InstallLocation', InstallLocation) and
-         LooksLikeWandPath(InstallLocation) then
+         (InstallLocation <> '') then
       begin
-        Result := InstallLocation;
-        Exit;
+        ResolvedPath := ResolveWandPath(InstallLocation);
+        if ResolvedPath <> '' then
+        begin
+          Result := ResolvedPath;
+          Exit;
+        end;
       end;
     end;
   end;
@@ -108,28 +202,31 @@ function GetWandPathAuto: string;
 var
   Candidates: TArrayOfString;
   I: Integer;
+  Resolved: string;
 begin
   Result := '';
 
   // Try registry first (per-user then per-machine).
   Result := TryGetWandPathFromRegistry(HKCU);
-  if LooksLikeWandPath(Result) then Exit;
+  if Result <> '' then Exit;
 
   Result := TryGetWandPathFromRegistry(HKLM);
-  if LooksLikeWandPath(Result) then Exit;
+  if Result <> '' then Exit;
 
   // Fallback to well-known locations.
-  SetArrayLength(Candidates, 4);
+  SetArrayLength(Candidates, 5);
   Candidates[0] := ExpandConstant('{localappdata}') + '\Programs\Wand';
   Candidates[1] := ExpandConstant('{localappdata}') + '\Wand';
-  Candidates[2] := ExpandConstant('{pf}') + '\Wand';
-  Candidates[3] := ExpandConstant('{pf32}') + '\Wand';
+  Candidates[2] := ExpandConstant('{localappdata}') + '\WeMod';
+  Candidates[3] := ExpandConstant('{pf}') + '\Wand';
+  Candidates[4] := ExpandConstant('{pf32}') + '\Wand';
 
   for I := 0 to GetArrayLength(Candidates) - 1 do
   begin
-    if LooksLikeWandPath(Candidates[I]) then
+    Resolved := ResolveWandPath(Candidates[I]);
+    if Resolved <> '' then
     begin
-      Result := Candidates[I];
+      Result := Resolved;
       Exit;
     end;
   end;
@@ -150,10 +247,10 @@ begin
     WandPathPage := CreateInputDirPage(wpSelectDir,
       PageCaption,
       'Auto-patch needs to know where Wand is installed.',
-      'Select the folder that contains Wand.exe, resources and app.asar, then click Next.',
+      'Select the WeMod/Wand folder. If Wand is in a versioned app-* subfolder, select the parent folder.',
       False, '');
     WandPathPage.Add('');
-    WandPathPage.Values[0] := ExpandConstant('{pf32}') + '\Wand';
+    WandPathPage.Values[0] := ExpandConstant('{localappdata}') + '\WeMod';
   end
   else
   begin
@@ -162,23 +259,36 @@ begin
 end;
 
 function GetWandPath(Param: string): string;
+var
+  SelectedPath, ResolvedPath: string;
 begin
   if DetectedWandPath <> '' then
     Result := DetectedWandPath
   else if (WandPathPage <> nil) and (WandPathPage.Values[0] <> '') then
-    Result := WandPathPage.Values[0]
+  begin
+    SelectedPath := WandPathPage.Values[0];
+    ResolvedPath := ResolveWandPath(SelectedPath);
+    if ResolvedPath <> '' then
+      Result := ResolvedPath
+    else
+      Result := SelectedPath;
+  end
   else
     Result := '';
 end;
 
 function ShouldEnableAutoPatch: Boolean;
 var
-  Path: string;
+  Path, ResolvedPath: string;
 begin
   Result := WizardIsTaskSelected('autopatch');
   if not Result then Exit;
 
   Path := GetWandPath('');
+  ResolvedPath := ResolveWandPath(Path);
+  if ResolvedPath <> '' then
+    Path := ResolvedPath;
+
   if Path = '' then
   begin
     Result := False;
@@ -198,9 +308,10 @@ begin
 
   if (WandPathPage <> nil) and (CurPageID = WandPathPage.ID) then
   begin
-    if not LooksLikeWandPath(WandPathPage.Values[0]) then
+    if ResolveWandPath(WandPathPage.Values[0]) = '' then
     begin
-      MsgBox('Please select a valid Wand installation folder containing Wand.exe, resources and app.asar.', mbError, MB_OK);
+      MsgBox('Please select a valid Wand installation folder containing Wand.exe, resources and app.asar.' + #13#10 +
+             'If Wand is installed under a versioned subfolder (e.g. app-12.43.1), select the parent WeMod folder.', mbError, MB_OK);
       Result := False;
     end;
   end;
