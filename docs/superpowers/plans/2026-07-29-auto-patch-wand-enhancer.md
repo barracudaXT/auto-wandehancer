@@ -109,17 +109,17 @@ Open `src/WandEnhancer/Core/` (or wherever `Enhancer.cs` lives) and identify:
 - The method signature (likely `public void Patch()` or `public void Patch(WeModInfo info, Action<string> log, PatchConfig config)`).
 - The type of `WeModInfo` and `PatchConfig`/`PatchVectors`.
 
-Record the exact signatures. The rest of the plan assumes:
+Record the exact signatures. The actual upstream signature is:
 
 ```csharp
 public class Enhancer
 {
-    public Enhancer(WeModInfo info, ILogger logger, PatchConfig config);
+    public Enhancer(WeModConfig weModConfig, Action<string, ELogType> logger, PatchConfig config);
     public void Patch();
 }
 ```
 
-If the actual signature differs, update later tasks accordingly.
+Use this exact signature in later tasks. `WeModConfig` is the Wand installation info type in the upstream project. The logger is `Action<string, ELogType>`, not a custom `ILogger` interface.
 
 - [ ] **Step 4: Commit baseline marker**
 
@@ -282,7 +282,7 @@ namespace WandEnhancer.Core.Models
 }
 ```
 
-If an existing `WeModInfo` class is in the WPF project, move it to Core and add `using WandEnhancer.Core.Models;` in the WPF project.
+If an existing `WeModConfig` class is in the WPF project, keep it where it is. The `WeModInfo` model in Core is used only by the locator; the patcher uses the upstream `WeModConfig` type. The locator will map `WeModInfo` to `WeModConfig` when invoking the patcher.
 
 - [ ] **Step 2: Implement `IWeModLocator`**
 
@@ -796,7 +796,7 @@ public interface IPatcher
 }
 ```
 
-- [ ] **Step 1: Add `ILogger` and `FileLogger`**
+- [ ] **Step 1: Add `ILogger` and `FileLogger` (used outside the patcher; the patcher itself takes `Action<string, ELogType>`)**
 
 Create `src/WandEnhancer.Core/Services/ILogger.cs`:
 
@@ -970,9 +970,9 @@ namespace WandEnhancer.Core.Services
 {
     public class Patcher : IPatcher
     {
-        private readonly ILogger _logger;
+        private readonly Action<string, WandEnhancer.Models.ELogType> _logger;
 
-        public Patcher(ILogger logger)
+        public Patcher(Action<string, WandEnhancer.Models.ELogType> logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
@@ -984,17 +984,18 @@ namespace WandEnhancer.Core.Services
 
             return Task.Run(() =>
             {
-                _logger.Info($"Starting patch for Wand at {info.BasePath}");
-                var enhancer = new Enhancer(info, _logger, config);
+                _logger($"Starting patch for Wand at {info.BasePath}", WandEnhancer.Models.ELogType.Info);
+                var weModConfig = new WandEnhancer.Models.WeModConfig { Path = info.BasePath };
+                var enhancer = new WandEnhancer.Core.Enhancer(weModConfig, _logger, config);
                 enhancer.Patch();
-                _logger.Info("Patch completed successfully.");
+                _logger("Patch completed successfully.", WandEnhancer.Models.ELogType.Info);
             });
         }
     }
 }
 ```
 
-If the existing `Enhancer` constructor signature differs, adjust the constructor call to match the actual signature discovered in Task 1.
+Note: the upstream `Enhancer` constructor uses `WeModConfig` and `Action<string, ELogType>`. The `WeModConfig` type is in the upstream `WandEnhancer.Models` namespace. Adjust namespaces if the actual code differs.
 
 - [ ] **Step 4: Add process termination tests**
 
@@ -1579,6 +1580,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Windows.Forms;
+using WandEnhancer.Core.Models;
 using WandEnhancer.Core.Services;
 
 namespace WandEnhancer.AutoPatch
@@ -1597,10 +1599,11 @@ namespace WandEnhancer.AutoPatch
             var logDirectory = Path.Combine(appData, "WandEnhancer", "logs");
 
             var logger = new FileLogger(logDirectory);
+            var patchLogger = new Action<string, WandEnhancer.Models.ELogType>((msg, type) => logger.Info(msg));
             var settingsStore = new SettingsStore(settingsPath);
             var locator = new WeModLocator(WandEnhancer.Core.Extensions.PathExtensions.CheckWeModPath);
             var processManager = new ProcessManager(logger);
-            var patcher = new Patcher(logger);
+            var patcher = new Patcher(patchLogger);
             var patchController = new PatchModeController(settingsStore, locator, processManager, patcher, logger);
 
             if (string.IsNullOrEmpty(arguments.Mode))
