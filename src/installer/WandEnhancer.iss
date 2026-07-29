@@ -69,6 +69,16 @@ begin
     Result := Release >= 528372;
 end;
 
+function LooksLikeWandPath(Path: string): Boolean;
+begin
+  // Keep this in sync with WandEnhancer.Core.Extensions.PathExtensions.CheckWeModPath.
+  Result := (Path <> '') and
+            DirExists(Path) and
+            FileExists(Path + '\Wand.exe') and
+            DirExists(Path + '\resources') and
+            FileExists(Path + '\app.asar');
+end;
+
 function TryGetWandPathFromRegistry(RootKey: Integer): string;
 var
   UninstallKey: string;
@@ -85,19 +95,13 @@ begin
       if RegQueryStringValue(RootKey, UninstallKey + '\' + SubKeyNames[I], 'DisplayName', DisplayName) and
          ((Pos('Wand', DisplayName) > 0) or (Pos('WeMod', DisplayName) > 0)) and
          RegQueryStringValue(RootKey, UninstallKey + '\' + SubKeyNames[I], 'InstallLocation', InstallLocation) and
-         (InstallLocation <> '') and
-         FileExists(InstallLocation + '\Wand.exe') then
+         LooksLikeWandPath(InstallLocation) then
       begin
         Result := InstallLocation;
         Exit;
       end;
     end;
   end;
-end;
-
-function LooksLikeWandPath(Path: string): Boolean;
-begin
-  Result := (Path <> '') and DirExists(Path) and FileExists(Path + '\Wand.exe');
 end;
 
 function GetWandPathAuto: string;
@@ -146,7 +150,7 @@ begin
     WandPathPage := CreateInputDirPage(wpSelectDir,
       PageCaption,
       'Auto-patch needs to know where Wand is installed.',
-      'Select the folder that contains Wand.exe, then click Next.',
+      'Select the folder that contains Wand.exe, resources and app.asar, then click Next.',
       False, '');
     WandPathPage.Add('');
     WandPathPage.Values[0] := ExpandConstant('{pf32}') + '\Wand';
@@ -181,9 +185,9 @@ begin
     Exit;
   end;
 
-  if not DirExists(Path) or not FileExists(Path + '\Wand.exe') then
+  if not LooksLikeWandPath(Path) then
   begin
-    MsgBox('The selected Wand folder does not contain Wand.exe. Auto-patch will not be enabled.', mbError, MB_OK);
+    MsgBox('The selected Wand folder is missing Wand.exe, resources or app.asar. Auto-patch will not be enabled.', mbError, MB_OK);
     Result := False;
   end;
 end;
@@ -196,7 +200,7 @@ begin
   begin
     if not LooksLikeWandPath(WandPathPage.Values[0]) then
     begin
-      MsgBox('Please select a valid Wand installation folder containing Wand.exe.', mbError, MB_OK);
+      MsgBox('Please select a valid Wand installation folder containing Wand.exe, resources and app.asar.', mbError, MB_OK);
       Result := False;
     end;
   end;
