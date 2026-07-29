@@ -65,6 +65,27 @@ function Resolve-DumpBinPath {
     return $dumpBinPath
 }
 
+function Resolve-InnoSetupPath {
+    $iscc = Get-Command 'iscc' -ErrorAction SilentlyContinue
+    if ($iscc) {
+        return $iscc.Source
+    }
+
+    $candidates = @(
+        Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+        Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe'
+        Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe'
+    )
+
+    foreach ($candidate in $candidates) {
+        if (Test-Path $candidate) {
+            return $candidate
+        }
+    }
+
+    throw 'Inno Setup compiler (ISCC.exe) not found.'
+}
+
 function Invoke-Step {
     param(
         [string]$Label,
@@ -83,6 +104,7 @@ $pnpm = Resolve-CommandPath 'pnpm'
 $visualStudio = Resolve-VisualStudioPath
 $msbuild = Resolve-MSBuildPath $visualStudio
 $dumpBin = Resolve-DumpBinPath $visualStudio
+$iscc = Resolve-InnoSetupPath
 
 Invoke-Step 'Install web-panel dependencies' {
     & $pnpm --dir $webPanelDir install --frozen-lockfile
@@ -115,6 +137,12 @@ Invoke-Step 'Restore NuGet packages' {
 
 Invoke-Step 'Build solution' {
     & $msbuild $solutionPath /m /p:Configuration=$Configuration '/p:Platform=Any CPU' /t:Build
+}
+
+Invoke-Step 'Build installer' {
+    $installerScript = Join-Path $repoRoot 'installer\WandEnhancer.iss'
+    $installerSource = Join-Path $repoRoot "WandEnhancer\bin\$Configuration"
+    & $iscc "/DOutputDir=$installerSource" $installerScript
 }
 
 Write-Host ''

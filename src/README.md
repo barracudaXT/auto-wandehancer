@@ -72,6 +72,16 @@ WandEnhancer can automatically keep Wand patched after updates and ensure every 
 
 ### Enabling auto-patch
 
+**One-click installer (recommended)**
+
+1. Build the project: run `build.cmd` (or `build.ps1 -Configuration Release`) from the `src` folder.
+2. Run the generated installer: `dist\WandEnhancerSetup.exe`.
+3. Accept the UAC prompt once.
+
+The installer auto-detects the Wand folder, installs WandEnhancer, replaces the Wand shortcut with the auto-patch launcher, and creates the watcher task. If Wand is not found, you will be asked to point to its folder.
+
+**Manual enablement**
+
 1. Build the project and run `WandEnhancer.exe`.
 2. Click the **shield icon** in the top-right corner to open **Auto-patch setup**.
 3. Confirm or pick the Wand installation directory.
@@ -80,6 +90,9 @@ WandEnhancer can automatically keep Wand patched after updates and ensure every 
 
 ### Disabling auto-patch
 
+**From the installer:** use **Apps > Installed apps > WandEnhancer > Uninstall**. The installer restores the original Wand shortcut and removes the watcher task.
+
+**From the app:**
 1. Open **Auto-patch setup** from the shield icon.
 2. Click **Disable** and confirm the UAC prompt.
 3. The original Wand shortcut is restored and the watcher task is removed.
