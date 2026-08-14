@@ -57,6 +57,7 @@
     <Compile Include="Constants.cs" />
     <Compile Include="Core\Enhancer.cs" />
     <Compile Include="Core\EnhancerConfig.cs" />
+    <Compile Include="Core\PatchEngine.cs" />
     <Compile Include="Extensions\PathExtensions.cs" />
     <Compile Include="Models\ELogType.cs" />
     <Compile Include="Models\PatchConfig.cs" />
