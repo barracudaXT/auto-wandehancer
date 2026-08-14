@@ -125,7 +125,10 @@ namespace WandEnhancer.View.Popups
             var newConfig = _savedConfig != null ? new PatchConfig
             {
                 Path = _savedConfig.Path,
-                AutoApplyPatches = _savedConfig.AutoApplyPatches
+                AutoApplyPatches = _savedConfig.AutoApplyPatches,
+                PatchingCompleted = false,
+                LastPatchedPayloadPath = null,
+                LastPatchedVersion = null
             } : new PatchConfig();
 
             newConfig.PatchTypes = result;

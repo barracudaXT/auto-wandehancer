@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -10,6 +11,7 @@ using WandEnhancer.Core;
 using WandEnhancer.Core.Models;
 using WandEnhancer.Core.Services;
 using WandEnhancer.ReactiveUICore;
+using WandEnhancer.Services;
 using WandEnhancer.Utils;
 using WandEnhancer.View.Popups;
 using Application = System.Windows.Application;
@@ -63,6 +65,22 @@ namespace WandEnhancer.View.MainWindow
         {
             get => _alreadyPatched;
             set => SetProperty(ref _alreadyPatched, value);
+        }
+
+        private bool _isAutoPatchEnabled;
+
+        public bool IsAutoPatchEnabled
+        {
+            get => _isAutoPatchEnabled;
+            set => SetProperty(ref _isAutoPatchEnabled, value);
+        }
+
+        private string _autoPatchStatusDescription;
+
+        public string AutoPatchStatusDescription
+        {
+            get => _autoPatchStatusDescription;
+            set => SetProperty(ref _autoPatchStatusDescription, value);
         }
 
         public RelayCommand SetFolderPathCommand { get; }
@@ -142,6 +160,10 @@ namespace WandEnhancer.View.MainWindow
             }
 
             Log("Backup restored successfully.", ELogType.Success);
+            _patchConfig.PatchingCompleted = false;
+            _patchConfig.LastPatchedPayloadPath = null;
+            _patchConfig.LastPatchedVersion = null;
+            _settingsStore.Save(_patchConfig);
             AlreadyPatched = false;
             IsPatchEnabled = true;
         }
@@ -165,6 +187,11 @@ namespace WandEnhancer.View.MainWindow
                     try
                     {
                         new Enhancer(WeModInfo, Log, _patchConfig).Patch();
+                        _patchConfig.PatchingCompleted = true;
+                        _patchConfig.LastPatchedPayloadPath = WeModInfo.RootDirectory;
+                        _patchConfig.LastPatchedVersion = FileVersionInfo.GetVersionInfo(
+                            Path.Combine(WeModInfo.RootDirectory, WeModInfo.ExecutableName)).FileVersion;
+                        _settingsStore.Save(_patchConfig);
                         AlreadyPatched = true;
                     }
                     catch (Exception e)
@@ -174,6 +201,38 @@ namespace WandEnhancer.View.MainWindow
                     }
                 });
             }, _patchConfig), Application.Current.FindResource("pv_popup_title") as string);
+        }
+
+        public void RefreshAutoPatchStatus()
+        {
+            try
+            {
+                var taskExists = new ScheduledTaskRegistrar().Exists();
+                var shortcutRegistered = new ShortcutRegistrar().IsRegistered();
+                IsAutoPatchEnabled = taskExists && shortcutRegistered;
+
+                if (IsAutoPatchEnabled)
+                {
+                    AutoPatchStatusDescription = "Auto-patch is enabled. Wand shortcuts are redirected to the auto-patch launcher.";
+                }
+                else if (!taskExists && !shortcutRegistered)
+                {
+                    AutoPatchStatusDescription = "Auto-patch is disabled. Click the shield icon to set it up.";
+                }
+                else if (!taskExists)
+                {
+                    AutoPatchStatusDescription = "Auto-patch watcher task is missing. Click the shield icon to repair.";
+                }
+                else
+                {
+                    AutoPatchStatusDescription = "Auto-patch shortcut replacement is missing. Click the shield icon to repair.";
+                }
+            }
+            catch (Exception ex)
+            {
+                IsAutoPatchEnabled = false;
+                AutoPatchStatusDescription = $"Could not verify auto-patch status: {ex.Message}";
+            }
         }
 
         private void Log(string message, ELogType logType)
@@ -276,6 +335,18 @@ namespace WandEnhancer.View.MainWindow
             {
                 Log("WeMod directory not found.", ELogType.Error);
             }
+
+            if (_patchConfig.PatchingCompleted)
+            {
+                var patchedIndicator = Path.Combine(WeModInfo?.RootDirectory ?? _patchConfig.Path, "resources", "app.asar.backup");
+                if (!File.Exists(patchedIndicator))
+                {
+                    _patchConfig.PatchingCompleted = false;
+                    _settingsStore.Save(_patchConfig);
+                }
+            }
+
+            RefreshAutoPatchStatus();
         }
     }
 }
