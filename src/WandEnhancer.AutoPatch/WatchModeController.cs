@@ -15,7 +15,7 @@ namespace WandEnhancer.AutoPatch
         private readonly object _watcherLock = new object();
         private readonly TimeSpan _debounceInterval = TimeSpan.FromSeconds(5);
         private FileSystemWatcher _watcher;
-        private DateTime _lastEvent = DateTime.MinValue;
+        private bool _pendingRecheck;
         private bool _enabled = true;
         private CancellationTokenSource _lifetimeCts;
         private Task _inFlightPatchTask;
@@ -135,50 +135,59 @@ namespace WandEnhancer.AutoPatch
 
         private void OnChanged(object sender, FileSystemEventArgs e)
         {
-            var now = DateTime.UtcNow;
             lock (_watcherLock)
             {
-                if (now - _lastEvent < _debounceInterval) return;
-                _lastEvent = now;
+                _pendingRecheck = true;
             }
-
-            var task = HandleChangedAsync(e, _lifetimeCts.Token);
+            var task = HandlePendingAsync(_lifetimeCts.Token);
             Interlocked.Exchange(ref _inFlightPatchTask, task);
             _ = task.ContinueWith(t =>
             {
                 if (t.IsFaulted)
                     _logger.Error($"In-flight patch task faulted: {t.Exception}");
+                bool needRecheck;
+                lock (_watcherLock) { needRecheck = _pendingRecheck; }
+                if (needRecheck && !t.IsFaulted)
+                {
+                    var followUp = HandlePendingAsync(_lifetimeCts.Token);
+                    Interlocked.Exchange(ref _inFlightPatchTask, followUp);
+                    _ = followUp.ContinueWith(ft =>
+                    {
+                        if (ft.IsFaulted)
+                            _logger.Error($"Follow-up patch task faulted: {ft.Exception}");
+                        Interlocked.CompareExchange(ref _inFlightPatchTask, null, followUp);
+                    }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                }
                 Interlocked.CompareExchange(ref _inFlightPatchTask, null, task);
             }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         }
 
-        private async Task HandleChangedAsync(FileSystemEventArgs e, CancellationToken token)
+        private async Task HandlePendingAsync(CancellationToken token)
         {
+            if (!await _patchSemaphore.WaitAsync(0))
+            {
+                // A patch is already running. The latch stays set so the in-flight
+                // task's completion handler re-invokes us after it finishes.
+                return;
+            }
+
             try
             {
-                if (!await _patchSemaphore.WaitAsync(0))
-                {
-                    _logger.Info("Skipping patch: previous patch still running.");
-                    return;
-                }
+                // De-dup burst: give the updater time to finish writing files.
+                await Task.Delay(_debounceInterval, token).ConfigureAwait(false);
 
-                try
+                // Loop: keep patching until no new changes arrived during the last patch.
+                while (true)
                 {
-                    _logger.Info($"Detected change: {e.FullPath}");
-                    await Task.Delay(_debounceInterval, token).ConfigureAwait(false);
+                    lock (_watcherLock) { _pendingRecheck = false; }
+
                     var success = await _patchController.RunAsync(null, null, null).ConfigureAwait(false);
                     if (success)
-                    {
                         _notification.ShowInfo("WandEnhancer", "Wand was re-patched after an update.");
-                    }
                     else
-                    {
                         _notification.ShowWarning("WandEnhancer", "Auto-patch failed. Open WandEnhancer for details.");
-                    }
-                }
-                finally
-                {
-                    _patchSemaphore.Release();
+
+                    lock (_watcherLock) { if (!_pendingRecheck) return; }
                 }
             }
             catch (OperationCanceledException)
@@ -189,6 +198,10 @@ namespace WandEnhancer.AutoPatch
             {
                 _logger.Error($"Watcher patch handler failed: {ex}");
                 _notification.ShowError("WandEnhancer", $"Auto-patch error: {ex.Message}");
+            }
+            finally
+            {
+                _patchSemaphore.Release();
             }
         }
     }
