@@ -15,6 +15,7 @@ namespace WandEnhancer.Core.Tests
                 LocateAsync_WithConfiguredPath_ReturnsInfo().GetAwaiter().GetResult();
                 LocateAsync_WithInvalidConfiguredPath_FallsBackOrReturnsNull().GetAwaiter().GetResult();
                 PatchDecisionTests.RunAll();
+                UpdateDetectionTests.RunAll();
                 SettingsStoreTests.RunAll();
                 ProcessManagerTests.RunAll();
                 Console.WriteLine("All tests passed.");
