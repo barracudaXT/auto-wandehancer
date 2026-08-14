@@ -1,0 +1,27 @@
+# Normalize line endings — stop the LF/CRLF churn that pollutes diffs.
+# C# and XAML use CRLF (Windows convention, matches the existing repo).
+*.cs text eol=crlf
+*.xaml text eol=crlf
+*.csproj text eol=crlf
+*.sln text eol=crlf
+*.iss text eol=crlf
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.config text eol=crlf
+*.json text eol=crlf
+*.resx text eol=crlf
+
+# Markdown uses LF (cross-platform convention).
+*.md text eol=lf
+
+# Binary files — no line ending normalization.
+*.exe binary
+*.dll binary
+*.pdb binary
+*.ico binary
+*.woff2 binary
+*.webp binary
+*.png binary
+*.jpg binary
+*.svg binary
+*.ttf binary
