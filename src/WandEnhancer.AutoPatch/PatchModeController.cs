@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Threading.Tasks;
+using WandEnhancer.Core.Extensions;
 using WandEnhancer.Core.Models;
 using WandEnhancer.Core.Services;
 
@@ -64,6 +65,18 @@ namespace WandEnhancer.AutoPatch
                 config.Path = info.RootPath ?? info.BasePath;
                 _settingsStore.Save(config);
 
+                if (PatchDecision.ShouldSkipPatch(
+                    config.LastPatchedPayloadPath,
+                    config.LastPatchedVersion,
+                    info.BasePath,
+                    info.Version,
+                    PathExtensions.IsAlreadyPatched(info.BasePath)))
+                {
+                    progress?.Report("Wand is already patched at this version.");
+                    window?.ShowSuccess("Wand is already patched at this version.");
+                    return true;
+                }
+
                 progress?.Report("Terminating Wand processes...");
                 window?.SetStatus("Terminating Wand processes...");
                 await _processManager.TerminateAllWandProcessesAsync(TimeSpan.FromSeconds(10));
@@ -71,6 +84,11 @@ namespace WandEnhancer.AutoPatch
                 progress?.Report("Patching Wand...");
                 window?.SetStatus("Patching Wand...");
                 await _patcher.PatchAsync(info, config);
+
+                config.LastPatchedPayloadPath = info.BasePath;
+                config.LastPatchedVersion = info.Version;
+                config.PatchingCompleted = true;
+                _settingsStore.Save(config);
 
                 progress?.Report("Patch completed.");
                 window?.ShowSuccess("Wand patched successfully.");

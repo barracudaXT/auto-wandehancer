@@ -73,6 +73,7 @@
     <Compile Include="Services\IWeModLocator.cs" />
     <Compile Include="Services\Patcher.cs" />
     <Compile Include="Services\ProcessManager.cs" />
+    <Compile Include="Services\PatchDecision.cs" />
     <Compile Include="Services\SettingsStore.cs" />
     <Compile Include="Services\WeModLocator.cs" />
   </ItemGroup>

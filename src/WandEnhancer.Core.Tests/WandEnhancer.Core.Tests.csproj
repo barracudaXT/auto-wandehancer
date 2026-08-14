@@ -38,6 +38,7 @@
     <ProjectReference Include="..\WandEnhancer.Core\WandEnhancer.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="PatchDecisionTests.cs" />
     <Compile Include="ProcessManagerTests.cs" />
     <Compile Include="SettingsStoreTests.cs" />
     <Compile Include="WeModLocatorTests.cs" />
