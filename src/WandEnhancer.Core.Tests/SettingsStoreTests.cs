@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Newtonsoft.Json;
 using WandEnhancer.Core.Models;
 using WandEnhancer.Core.Services;
 
@@ -14,6 +15,7 @@ namespace WandEnhancer.Core.Tests
             SaveAndLoad_RoundTripsConfig();
             Load_MissingFile_ReturnsDefaults();
             Save_CreatesDirectoryAndFile();
+            Save_ConcurrentProcesses_PreservesData();
         }
 
         private static void SaveAndLoad_RoundTripsConfig()
@@ -110,6 +112,75 @@ namespace WandEnhancer.Core.Tests
             {
                 if (Directory.Exists(Path.GetDirectoryName(path)))
                     Directory.Delete(Path.GetDirectoryName(path), recursive: true);
+            }
+        }
+
+        private static void Save_ConcurrentProcesses_PreservesData()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(dir);
+            var path = Path.Combine(dir, "concurrent.json");
+            var store = new SettingsStore(path);
+            store.Save(new PatchConfig
+            {
+                PatchTypes = new HashSet<EPatchType> { EPatchType.ActivatePro },
+                LastPatchedVersion = "0.0.0"
+            });
+
+            var tasks = new List<System.Threading.Tasks.Task>();
+            var exceptions = new List<Exception>();
+            var lockObj = new object();
+            int completed = 0;
+
+            try
+            {
+                for (int i = 0; i < 8; i++)
+                {
+                    int id = i;
+                    tasks.Add(System.Threading.Tasks.Task.Run(() =>
+                    {
+                        try
+                        {
+                            for (int j = 0; j < 10; j++)
+                            {
+                                var cfg = store.Load();
+                                cfg.LastPatchedVersion = $"{id}.{j}";
+                                cfg.PatchTypes = new HashSet<EPatchType> { EPatchType.ActivatePro, EPatchType.RemoteWebPanelPreview };
+                                store.Save(cfg);
+                            }
+                            System.Threading.Interlocked.Increment(ref completed);
+                        }
+                        catch (Exception ex)
+                        {
+                            lock (lockObj)
+                            {
+                                exceptions.Add(ex);
+                            }
+                        }
+                    }));
+                }
+
+                System.Threading.Tasks.Task.WaitAll(tasks.ToArray());
+
+                if (exceptions.Count > 0)
+                    throw new Exception($"Concurrent saves produced {exceptions.Count} exceptions: {exceptions[0].Message}", exceptions[0]);
+
+                if (completed != 8)
+                    throw new Exception($"Expected all 8 writers to complete, only {completed} did.");
+
+                var final = store.Load();
+                if (final.PatchTypes == null || final.PatchTypes.Count != 2)
+                    throw new Exception("Expected final PatchTypes to contain two entries after concurrent writes.");
+
+                var json = File.ReadAllText(path);
+                var parsed = JsonConvert.DeserializeObject<PatchConfig>(json);
+                if (parsed == null)
+                    throw new Exception("Final settings file was empty or invalid after concurrent writes.");
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
             }
         }
 
