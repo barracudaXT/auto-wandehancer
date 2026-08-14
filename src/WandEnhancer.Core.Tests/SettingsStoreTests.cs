@@ -33,7 +33,9 @@ namespace WandEnhancer.Core.Tests
                     },
                     CustomScriptPaths = new List<string> { "script.js" },
                     AutoApplyPatches = true,
-                    Path = tempDir
+                    Path = tempDir,
+                    LastPatchedPayloadPath = tempDir,
+                    LastPatchedVersion = "12.44.0",
                 };
                 store.Save(config);
                 var loaded = store.Load();
@@ -50,6 +52,10 @@ namespace WandEnhancer.Core.Tests
                     throw new Exception("Expected AutoApplyPatches to be true");
                 if (loaded.Path != tempDir)
                     throw new Exception($"Expected Path={tempDir}, got {loaded.Path}");
+                if (loaded.LastPatchedPayloadPath != tempDir)
+                    throw new Exception("Expected LastPatchedPayloadPath to round-trip");
+                if (loaded.LastPatchedVersion != "12.44.0")
+                    throw new Exception("Expected LastPatchedVersion to round-trip");
             }
             finally
             {
@@ -67,8 +73,12 @@ namespace WandEnhancer.Core.Tests
             {
                 var store = new SettingsStore(path);
                 var loaded = store.Load();
-                if (loaded.PatchTypes != null && loaded.PatchTypes.Any())
-                    throw new Exception("Expected empty PatchTypes by default");
+                if (loaded.PatchTypes == null || loaded.PatchTypes.Count != 2)
+                    throw new Exception("Expected default PatchTypes to contain two entries");
+                if (!loaded.PatchTypes.Contains(EPatchType.ActivatePro))
+                    throw new Exception("Expected ActivatePro to be enabled by default");
+                if (!loaded.PatchTypes.Contains(EPatchType.RemoteWebPanelPreview))
+                    throw new Exception("Expected RemoteWebPanelPreview to be enabled by default");
                 if (loaded.AutoApplyPatches)
                     throw new Exception("Expected AutoApplyPatches default false");
                 if (loaded.Path != null)
