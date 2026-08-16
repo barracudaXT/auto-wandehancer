@@ -24,7 +24,7 @@ namespace WandEnhancer.AutoPatch
         {
             _icon = new NotifyIcon
             {
-                Icon = SystemIcons.Application,
+                Icon = LoadEmbeddedIcon(),
                 Text = "WandEnhancer Auto-Patch",
                 Visible = true
             };
@@ -38,6 +38,25 @@ namespace WandEnhancer.AutoPatch
             menu.Items.Add("Exit", null, (s, e) => ExitClicked?.Invoke(this, e));
 
             _icon.ContextMenuStrip = menu;
+        }
+
+        private static Icon LoadEmbeddedIcon()
+        {
+            try
+            {
+                var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+                const string resourceName = "WandEnhancer.AutoPatch.appicon.ico";
+                using (var stream = assembly.GetManifestResourceStream(resourceName))
+                {
+                    if (stream != null)
+                        return new Icon(stream);
+                }
+            }
+            catch
+            {
+                // Fall back to the default icon if the embedded resource can't be loaded.
+            }
+            return SystemIcons.Application;
         }
 
         private void OnToggleEnabled(object sender, EventArgs e)

@@ -75,6 +75,21 @@ namespace WandEnhancer
                     new ScheduledTaskRegistrar().Create(wandPath, autoPatchPath);
                     WriteSetupLog(setupLogPath, "Scheduled task created.");
 
+                    // Kill any existing watcher process so we don't end up with duplicate tray icons.
+                    try
+                    {
+                        foreach (var proc in System.Diagnostics.Process.GetProcessesByName("WandEnhancer.AutoPatch"))
+                        {
+                            try { proc.Kill(); proc.WaitForExit(3000); } catch { }
+                            proc.Dispose();
+                        }
+                        WriteSetupLog(setupLogPath, "Killed existing watcher process(es).");
+                    }
+                    catch (Exception killEx)
+                    {
+                        WriteSetupLog(setupLogPath, $"Failed to kill existing watcher: {killEx.Message}");
+                    }
+
                     // Start the watcher immediately so it's running right now, not just at next logon.
                     try
                     {
