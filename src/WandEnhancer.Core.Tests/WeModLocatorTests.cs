@@ -19,6 +19,7 @@ namespace WandEnhancer.Core.Tests
                 SettingsStoreTests.RunAll();
                 ProcessManagerTests.RunAll();
                 PatchEngineTests.RunAll();
+                ShortcutReRegistrationTests.RunAll();
                 Console.WriteLine("All tests passed.");
                 return 0;
             }

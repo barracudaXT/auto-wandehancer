@@ -50,6 +50,7 @@
     <Compile Include="PatchEngineTests.cs" />
     <Compile Include="ProcessManagerTests.cs" />
     <Compile Include="SettingsStoreTests.cs" />
+    <Compile Include="ShortcutReRegistrationTests.cs" />
     <Compile Include="WeModLocatorTests.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

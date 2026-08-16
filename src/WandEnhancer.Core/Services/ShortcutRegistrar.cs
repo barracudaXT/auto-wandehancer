@@ -38,15 +38,22 @@ namespace WandEnhancer.Core.Services
             {
                 var original = Shortcut.LoadShortcut(shortcutPath);
                 var backupPath = shortcutPath + OriginalExtension;
-                var backup = new ShortcutBackup
+
+                // Only create a backup if one does not already exist, so re-registration
+                // after Squirrel (or anything else) overwrites the shortcut does not destroy
+                // the original target we need for uninstall/restore.
+                if (!File.Exists(backupPath))
                 {
-                    TargetPath = original.TargetPath,
-                    Arguments = original.Arguments,
-                    WorkingDirectory = original.WorkingDirectory,
-                    Description = original.Description,
-                    IconPath = original.IconPath
-                };
-                File.WriteAllText(backupPath, JsonConvert.SerializeObject(backup, Formatting.Indented));
+                    var backup = new ShortcutBackup
+                    {
+                        TargetPath = original.TargetPath,
+                        Arguments = original.Arguments,
+                        WorkingDirectory = original.WorkingDirectory,
+                        Description = original.Description,
+                        IconPath = original.IconPath
+                    };
+                    File.WriteAllText(backupPath, JsonConvert.SerializeObject(backup, Formatting.Indented));
+                }
 
                 var launchArgs = BuildLaunchArguments(wandPath, original.Arguments);
                 var iconPath = original.IconPath;
