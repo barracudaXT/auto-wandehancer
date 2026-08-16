@@ -75,6 +75,25 @@ namespace WandEnhancer
                     new ScheduledTaskRegistrar().Create(wandPath, autoPatchPath);
                     WriteSetupLog(setupLogPath, "Scheduled task created.");
 
+                    // Start the watcher immediately so it's running right now, not just at next logon.
+                    try
+                    {
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = autoPatchPath,
+                            Arguments = $"--watch \"{wandPath}\"",
+                            UseShellExecute = false,
+                            CreateNoWindow = true,
+                            WorkingDirectory = Path.GetDirectoryName(autoPatchPath)
+                        });
+                        WriteSetupLog(setupLogPath, "Watcher process started.");
+                    }
+                    catch (Exception watchEx)
+                    {
+                        WriteSetupLog(setupLogPath, $"Failed to start watcher: {watchEx.Message}");
+                        // Non-fatal — the scheduled task will start it at next logon.
+                    }
+
                     MessageBox.Show("Auto-patch enabled successfully.", "WandEnhancer");
                     Environment.Exit(0);
                     return true;
