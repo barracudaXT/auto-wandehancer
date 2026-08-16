@@ -90,6 +90,21 @@ namespace WandEnhancer.AutoPatch
                 config.PatchingCompleted = true;
                 _settingsStore.Save(config);
 
+                // Re-register shortcuts after every successful patch — Squirrel may have
+                // overwritten them when installing the new Wand version.
+                try
+                {
+                    var autoPatchExePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                    var wandRootPath = info.RootPath ?? info.BasePath;
+                    new ShortcutRegistrar().Register(wandRootPath, autoPatchExePath);
+                    _logger.Info("Shortcuts re-registered after patch.");
+                }
+                catch (Exception scEx)
+                {
+                    _logger.Error($"Failed to re-register shortcuts: {scEx.Message}");
+                    // Non-fatal — the patch itself succeeded.
+                }
+
                 progress?.Report("Patch completed.");
                 window?.ShowSuccess("Wand patched successfully.");
                 return true;

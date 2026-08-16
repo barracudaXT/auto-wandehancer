@@ -77,6 +77,9 @@
     <Compile Include="Services\PatchDecision.cs" />
     <Compile Include="Services\SettingsStore.cs" />
     <Compile Include="Services\WeModLocator.cs" />
+    <Compile Include="Services\ShortcutRegistrar.cs" />
+    <Compile Include="Services\IShortcutRegistrar.cs" />
+    <Compile Include="Utils\Win32\Shortcut.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="$(ProxyDllPath)">

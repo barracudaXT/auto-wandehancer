@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Newtonsoft.Json;
-using WandEnhancer.Utils.Win32;
+using WandEnhancer.Core.Utils.Win32;
 
-namespace WandEnhancer.Services
+namespace WandEnhancer.Core.Services
 {
     public class ShortcutRegistrar : IShortcutRegistrar
     {
@@ -22,6 +22,11 @@ namespace WandEnhancer.Services
 
         public void Register(string wandPath, string autoPatchExePath)
         {
+            Register(wandPath, autoPatchExePath, GetShortcutSearchDirectories());
+        }
+
+        public void Register(string wandPath, string autoPatchExePath, IEnumerable<string> searchDirectories)
+        {
             if (string.IsNullOrWhiteSpace(wandPath))
                 throw new ArgumentException("Wand path cannot be empty.", nameof(wandPath));
             if (!Directory.Exists(wandPath))
@@ -29,7 +34,7 @@ namespace WandEnhancer.Services
             if (!File.Exists(autoPatchExePath))
                 throw new FileNotFoundException("Auto-patch executable not found.", autoPatchExePath);
 
-            foreach (var shortcutPath in FindWandShortcuts(wandPath))
+            foreach (var shortcutPath in FindWandShortcuts(wandPath, searchDirectories))
             {
                 var original = Shortcut.LoadShortcut(shortcutPath);
                 var backupPath = shortcutPath + OriginalExtension;
@@ -44,13 +49,18 @@ namespace WandEnhancer.Services
                 File.WriteAllText(backupPath, JsonConvert.SerializeObject(backup, Formatting.Indented));
 
                 var launchArgs = BuildLaunchArguments(wandPath, original.Arguments);
+                var iconPath = original.IconPath;
+                if (string.IsNullOrWhiteSpace(iconPath) || !File.Exists(iconPath.Split(',')[0]))
+                {
+                    iconPath = original.TargetPath;
+                }
                 Shortcut.CreateShortcut(
                     shortcutPath,
                     autoPatchExePath,
                     launchArgs,
                     wandPath,
                     original.Description,
-                    original.IconPath);
+                    iconPath);
             }
         }
 
@@ -79,6 +89,11 @@ namespace WandEnhancer.Services
             }
         }
 
+        public bool IsRegistered()
+        {
+            return FindOriginalBackups().Count > 0;
+        }
+
         private static string BuildLaunchArguments(string wandPath, string originalArguments)
         {
             var args = $"--launch \"{wandPath}\"";
@@ -87,11 +102,16 @@ namespace WandEnhancer.Services
             return args;
         }
 
-        private static List<string> FindWandShortcuts(string wandPath)
+        private static List<string> FindWandShortcuts(string wandPath, IEnumerable<string> searchDirectories)
         {
             var result = new List<string>();
-            var wandExePath = Path.Combine(wandPath, "Wand.exe");
-            foreach (var directory in GetShortcutSearchDirectories())
+            var candidateNames = new[] { "Wand.exe", "WeMod.exe" };
+            var candidatePaths = candidateNames
+                .Select(name => Path.Combine(wandPath, name))
+                .Where(File.Exists)
+                .ToList();
+
+            foreach (var directory in searchDirectories)
             {
                 if (!Directory.Exists(directory))
                     continue;
@@ -104,8 +124,8 @@ namespace WandEnhancer.Services
                         if (string.IsNullOrWhiteSpace(shortcut.TargetPath))
                             continue;
 
-                        if (IsSameTarget(shortcut.TargetPath, wandExePath) ||
-                            shortcut.TargetPath.EndsWith("Wand.exe", StringComparison.OrdinalIgnoreCase))
+                        if (candidatePaths.Any(candidate => IsSameTarget(shortcut.TargetPath, candidate)) ||
+                            candidateNames.Any(name => shortcut.TargetPath.EndsWith(name, StringComparison.OrdinalIgnoreCase)))
                         {
                             result.Add(shortcutPath);
                         }

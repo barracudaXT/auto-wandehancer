@@ -1,7 +1,7 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 
-namespace WandEnhancer.Utils.Win32
+namespace WandEnhancer.Core.Utils.Win32
 {
     public class Shortcut
     {
@@ -54,7 +54,14 @@ namespace WandEnhancer.Utils.Win32
             shortcut.WorkingDirectory = workingDirectory;
             shortcut.Arguments        = arguments;
             if (!string.IsNullOrEmpty(iconPath))
+            {
+                // WScript.Shell stores "path,index". If only an executable path is
+                // provided, append the default icon index (0) so Windows uses the
+                // first icon resource in that file.
+                if (!iconPath.Contains(","))
+                    iconPath += ",0";
                 shortcut.IconLocation = iconPath;
+            }
             shortcut.Save();
         }
 

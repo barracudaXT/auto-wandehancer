@@ -74,12 +74,9 @@
         <Compile Include="ReactiveUICore\RelayCommand.cs" />
         <Compile Include="Utils\Common.cs" />
         <Compile Include="Utils\Extensions.cs" />
-        <Compile Include="Utils\Win32\Shortcut.cs" />
         <Compile Include="Services\ElevationHelper.cs" />
         <Compile Include="Services\IScheduledTaskRegistrar.cs" />
         <Compile Include="Services\ScheduledTaskRegistrar.cs" />
-        <Compile Include="Services\IShortcutRegistrar.cs" />
-        <Compile Include="Services\ShortcutRegistrar.cs" />
         <Compile Include="View\Controls\InfoItem.xaml.cs">
           <DependentUpon>InfoItem.xaml</DependentUpon>
         </Compile>
