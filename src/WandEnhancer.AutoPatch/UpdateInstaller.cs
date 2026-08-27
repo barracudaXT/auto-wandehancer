@@ -19,7 +19,7 @@ namespace WandEnhancer.AutoPatch
             _notification = notification ?? throw new ArgumentNullException(nameof(notification));
         }
 
-        public async Task<bool> DownloadAndInstallAsync(UpdateInfo update, CancellationToken token)
+        public async Task<bool> DownloadAndInstallAsync(UpdateInfo update, CancellationToken token, IProgress<int> progress = null)
         {
             if (update == null || string.IsNullOrEmpty(update.DownloadUrl))
                 return false;
@@ -40,6 +40,11 @@ namespace WandEnhancer.AutoPatch
                 {
                     client.Headers.Add("User-Agent", "WandEnhancer-AutoUpdate");
 
+                    if (progress != null)
+                    {
+                        client.DownloadProgressChanged += (s, e) => progress.Report(e.ProgressPercentage);
+                    }
+
                     using (token.Register(() => client.CancelAsync()))
                     {
                         await client.DownloadFileTaskAsync(new Uri(update.DownloadUrl), installerPath);
@@ -50,6 +55,7 @@ namespace WandEnhancer.AutoPatch
                     return false;
 
                 _logger.Info($"Download complete. Running installer: {installerPath}");
+                progress?.Report(-1);
                 _notification.ShowInfo("WandEnhancer", "Installing update...");
 
                 var psi = new ProcessStartInfo

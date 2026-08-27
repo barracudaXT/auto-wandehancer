@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -252,11 +252,18 @@ namespace WandEnhancer.AutoPatch
 
                     tray.CheckForUpdatesClicked += (s, e) =>
                     {
+                        tray.ShowCheckingForUpdates();
                         Task.Run(async () =>
                         {
                             try
                             {
                                 var info = await updateChecker.CheckForUpdateAsync();
+                                if (info == null)
+                                {
+                                    tray.ShowUpdateCheckFailed();
+                                    tray.ShowError("WandEnhancer", "Could not check for updates. Try again later.");
+                                    return;
+                                }
                                 if (updateChecker.IsUpdateAvailable(info))
                                 {
                                     pendingUpdate = info;
@@ -272,6 +279,8 @@ namespace WandEnhancer.AutoPatch
                             catch (Exception ex)
                             {
                                 logger.Error($"Manual update check failed: {ex}");
+                                tray.ShowUpdateCheckFailed();
+                                tray.ShowError("WandEnhancer", "Could not check for updates. Try again later.");
                             }
                         });
                     };
@@ -280,13 +289,25 @@ namespace WandEnhancer.AutoPatch
                     {
                         var update = pendingUpdate;
                         if (update == null) return;
+                        tray.ShowDownloading(0);
                         Task.Run(async () =>
                         {
-                            var installed = await updateInstaller.DownloadAndInstallAsync(update, cts.Token);
+                            var progress = new Progress<int>(pct =>
+                            {
+                                if (pct < 0)
+                                    tray.ShowInstalling();
+                                else
+                                    tray.ShowDownloading(pct);
+                            });
+                            var installed = await updateInstaller.DownloadAndInstallAsync(update, cts.Token, progress);
                             if (installed)
                             {
                                 cts.Cancel();
                                 Application.Exit();
+                            }
+                            else
+                            {
+                                tray.ShowUpdateAvailable(update.TagName);
                             }
                         });
                     };

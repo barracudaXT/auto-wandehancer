@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Windows.Forms;
 using WandEnhancer.Core.Services;
@@ -56,6 +56,17 @@ namespace WandEnhancer.AutoPatch
                 CheckForUpdatesClicked?.Invoke(this, e);
         }
 
+        public void ShowCheckingForUpdates()
+        {
+            if (_icon.ContextMenuStrip.InvokeRequired)
+            {
+                _icon.ContextMenuStrip.BeginInvoke(new Action(ShowCheckingForUpdates));
+                return;
+            }
+            _updateMenuItem.Text = "Checking for updates...";
+            _updateMenuItem.Enabled = false;
+        }
+
         public void ShowUpdateAvailable(string version)
         {
             if (_icon.ContextMenuStrip.InvokeRequired)
@@ -64,6 +75,7 @@ namespace WandEnhancer.AutoPatch
                 return;
             }
             _updatePending = true;
+            _updateMenuItem.Enabled = true;
             _updateMenuItem.Text = $"Update available: {version}";
             _icon.ShowBalloonTip(5000, "WandEnhancer", $"Version {version} is available. Right-click the tray icon to update.", ToolTipIcon.Info);
         }
@@ -76,7 +88,41 @@ namespace WandEnhancer.AutoPatch
                 return;
             }
             _updatePending = false;
+            _updateMenuItem.Enabled = true;
             _updateMenuItem.Text = "Check for updates";
+        }
+
+        public void ShowUpdateCheckFailed()
+        {
+            if (_icon.ContextMenuStrip.InvokeRequired)
+            {
+                _icon.ContextMenuStrip.BeginInvoke(new Action(ShowUpdateCheckFailed));
+                return;
+            }
+            _updateMenuItem.Enabled = true;
+            _updateMenuItem.Text = "Check for updates";
+        }
+
+        public void ShowDownloading(int progressPercent)
+        {
+            if (_icon.ContextMenuStrip.InvokeRequired)
+            {
+                _icon.ContextMenuStrip.BeginInvoke(new Action(() => ShowDownloading(progressPercent)));
+                return;
+            }
+            _updateMenuItem.Enabled = false;
+            _updateMenuItem.Text = $"Downloading update... {progressPercent}%";
+        }
+
+        public void ShowInstalling()
+        {
+            if (_icon.ContextMenuStrip.InvokeRequired)
+            {
+                _icon.ContextMenuStrip.BeginInvoke(new Action(ShowInstalling));
+                return;
+            }
+            _updateMenuItem.Enabled = false;
+            _updateMenuItem.Text = "Installing update...";
         }
 
         public void ShowInfo(string title, string message) => ShowBalloon(title, message, ToolTipIcon.Info);
