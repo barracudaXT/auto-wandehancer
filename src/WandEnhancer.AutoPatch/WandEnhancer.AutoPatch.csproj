@@ -9,6 +9,7 @@
     <RootNamespace>WandEnhancer.AutoPatch</RootNamespace>
     <AssemblyName>WandEnhancer.AutoPatch</AssemblyName>
     <ApplicationIcon>..\assets\appicon.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -58,6 +59,9 @@
     <EmbeddedResource Include="..\assets\appicon.ico">
       <LogicalName>WandEnhancer.AutoPatch.appicon.ico</LogicalName>
     </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="app.manifest" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

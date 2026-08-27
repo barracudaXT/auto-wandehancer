@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -14,6 +14,7 @@ namespace WandEnhancer.AutoPatch
         public ProgressWindow()
         {
             Text = "Wand Enhancer Auto-Patch";
+            AutoScaleMode = AutoScaleMode.Dpi;
             Size = new Size(400, 160);
             StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -62,27 +63,10 @@ namespace WandEnhancer.AutoPatch
         public event EventHandler RetryRequested;
         public event EventHandler OpenMainRequested;
 
-        public void SetStatus(string text)
-        {
-            if (IsDisposed || !IsHandleCreated)
-                return;
-            if (InvokeRequired)
-            {
-                Invoke(new Action(() => SetStatus(text)));
-                return;
-            }
-            _statusLabel.Text = text;
-        }
+        public void SetStatus(string text) => RunOnUI(() => _statusLabel.Text = text);
 
-        public void ShowSuccess(string message)
+        public void ShowSuccess(string message) => RunOnUI(() =>
         {
-            if (IsDisposed || !IsHandleCreated)
-                return;
-            if (InvokeRequired)
-            {
-                Invoke(new Action(() => ShowSuccess(message)));
-                return;
-            }
             _statusLabel.Text = message;
             _progressBar.Style = ProgressBarStyle.Continuous;
             _progressBar.Value = 100;
@@ -94,47 +78,35 @@ namespace WandEnhancer.AutoPatch
                 SafeClose();
             };
             timer.Start();
-        }
+        });
 
-        public void ShowFailure(string message)
+        public void ShowFailure(string message) => RunOnUI(() =>
         {
-            if (IsDisposed || !IsHandleCreated)
-                return;
-            if (InvokeRequired)
-            {
-                Invoke(new Action(() => ShowFailure(message)));
-                return;
-            }
             _statusLabel.Text = message;
             _progressBar.Style = ProgressBarStyle.Continuous;
             _progressBar.Value = 0;
             _retryButton.Visible = true;
             _openMainButton.Visible = true;
-        }
+        });
 
-        public void HideFailureButtons()
+        public void HideFailureButtons() => RunOnUI(() =>
         {
-            if (IsDisposed || !IsHandleCreated)
-                return;
-            if (InvokeRequired)
-            {
-                Invoke(new Action(HideFailureButtons));
-                return;
-            }
             _retryButton.Visible = false;
             _openMainButton.Visible = false;
-        }
+        });
 
-        public void SafeClose()
+        public void SafeClose() => RunOnUI(() => base.Close());
+
+        private void RunOnUI(Action action)
         {
             if (IsDisposed || !IsHandleCreated)
                 return;
             if (InvokeRequired)
             {
-                Invoke(new Action(() => base.Close()));
+                Invoke(action);
                 return;
             }
-            base.Close();
+            action();
         }
     }
 }

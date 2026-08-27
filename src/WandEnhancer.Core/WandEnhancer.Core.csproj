@@ -64,6 +64,7 @@
     <Compile Include="Services\ILogger.cs" />
     <Compile Include="Services\INotificationService.cs" />
     <Compile Include="Services\NotificationService.cs" />
+    <Compile Include="Services\NullNotificationService.cs" />
     <Compile Include="Services\IPatcher.cs" />
     <Compile Include="Services\IProcessManager.cs" />
     <Compile Include="Services\ISettingsStore.cs" />

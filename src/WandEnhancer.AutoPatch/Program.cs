@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -52,7 +52,7 @@ namespace WandEnhancer.AutoPatch
 
         private static async Task RunPatchMode(ISettingsStore settingsStore, IWeModLocator locator, IProcessManager processManager, IPatcher patcher, ILogger logger, string path)
         {
-            using (var notification = new NotificationService())
+            var notification = new NullNotificationService();
             using (var window = new ProgressWindow())
             {
                 // Ensure the window handle is created before the background task
@@ -170,7 +170,7 @@ namespace WandEnhancer.AutoPatch
 
         private static async Task RunLaunchMode(ISettingsStore settingsStore, IWeModLocator locator, IProcessManager processManager, IPatcher patcher, ILogger logger, string path, string[] wandArgs)
         {
-            using (var notification = new NotificationService())
+            var notification = new NullNotificationService();
             using (var window = new ProgressWindow())
             {
                 // Ensure the window handle is created before the background task

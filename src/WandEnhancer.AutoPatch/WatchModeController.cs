@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -35,11 +35,6 @@ namespace WandEnhancer.AutoPatch
                 }
                 _logger.Info($"Watcher {(_enabled ? "enabled" : "paused")}.");
             }
-        }
-
-        public WatchModeController(PatchModeController patchController, ILogger logger)
-            : this(patchController, logger, new NotificationService())
-        {
         }
 
         public WatchModeController(PatchModeController patchController, ILogger logger, INotificationService notification)
