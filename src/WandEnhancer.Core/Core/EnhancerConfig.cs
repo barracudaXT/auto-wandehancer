@@ -101,180 +101,154 @@ namespace WandEnhancer.Core
         {
             return new Dictionary<EPatchType, PatchEntry[]>()
             {
+                { EPatchType.ActivatePro, GetActivateProEntries() },
+                { EPatchType.DisableUpdates, GetDisableUpdatesEntries() },
+                { EPatchType.DevToolsOnF12, GetDevToolsOnF12Entries() },
+                { EPatchType.RemoteWebPanelPreview, GetRemoteWebPanelEntries() }
+            };
+        }
+
+        private static PatchEntry[] GetActivateProEntries()
+        {
+            return new[]
+            {
+                new PatchEntry
                 {
-                    EPatchType.ActivatePro,
-                    new[]
+                    SearchHints = new[] { "getUserAccount()", "/v3/account" },
+                    Resolver = new ResolveContext
                     {
-                        new PatchEntry
+                        Handler = (targetFunction) =>
                         {
-                            SearchHints = new[] { "getUserAccount()", "/v3/account" },
-                            Resolver = new ResolveContext
-                            {
-                                Handler = (targetFunction) =>
-                                {
-                                    var fetchMatch = Regex.Match(targetFunction, @"return\s+this\.#(\w+)\.fetch");
-                                    return fetchMatch.Success ? fetchMatch.Groups[1].Value : null;
-                                },
-                                Placeholder = "<service_name>"
-                            },
-                            Name = "getUserAccount",
-                            Target = new Regex(@"getUserAccount\(\)\{.*?return\s+this\.#\w+\.fetch\(\{.*?\}\)\}",
-                                RegexOptions.Singleline),
-                            Patch =
-                                "getUserAccount(){return this.#<service_name>.fetch({endpoint:\"/v3/account\",method:\"GET\",name:\"/v3/account\",collectMetrics:0}).then(response=>{response.subscription={period:\"yearly\",state:\"active\"};return response;})}"
+                            var fetchMatch = Regex.Match(targetFunction, @"return\s+this\.#(\w+)\.fetch");
+                            return fetchMatch.Success ? fetchMatch.Groups[1].Value : null;
                         },
-                        new PatchEntry
-                        {
-                            SearchHints = new[] { "setAccountWandBrandExperience()", "/v3/account/brand_experience_wand" },
-                            Resolver = new ResolveContext
-                            {
-                                Handler = (targetFunction) =>
-                                {
-                                    var match = Regex.Match(targetFunction, @"return\s+this\.#(\w+)\.post");
-                                    return match.Success ? match.Groups[1].Value : null;
-                                },
-                                Placeholder = "<service_name>"
-                            },
-                            Name = "setAccountWandBrandExperience",
-                            Target = new Regex(
-                                @"setAccountWandBrandExperience\(\)\{.*?return\s+this\.#\w+\.post\(""/v3/account/brand_experience_wand""\)\}",
-                                RegexOptions.Singleline),
-                            Patch =
-                                "setAccountWandBrandExperience(){return this.#<service_name>.post(\"/v3/account/brand_experience_wand\").then(response=>{response.subscription={period:\"yearly\",state:\"active\"};return response;})}"
-                        },
-                        new PatchEntry
-                        {
-                            // Account-returning endpoint the original patches missed: changing
-                            // language dispatches its (non-Pro) response into the store and
-                            // wiped Pro. Wrap the result the same way. Param names are captured
-                            // so the rewritten body keeps the real argument identifiers.
-                            Name = "setAccountLanguage",
-                            SearchHints = new[] { "setAccountLanguage(", "/v3/account/language" },
-                            Target = new Regex(
-                                @"setAccountLanguage\((?<params>[^)]*)\)\{\s*return\s+(?<expr>this\.#\w+\.post\(""/v3/account/language"",\{[^}]*\}\))\s*;?\s*\}",
-                                RegexOptions.Singleline),
-                            PatchFactory = BuildSetAccountLanguagePatch
-                        },
-                        new PatchEntry
-                        {
-                            // Last-resort guard: any code path that dispatches ACTION_SET_ACCOUNT
-                            // (periodic refreshAccount, push updates, profile edits, etc.) must keep
-                            // subscription on the store object even when it bypasses the account API
-                            // service methods patched above.
-                            Name = "setAccountReducer",
-                            SearchHints = new[] { "ACTION_SET_ACCOUNT" },
-                            Target = new Regex(
-                                @"const (?<decl>\w+)=""ACTION_SET_ACCOUNT"";function (?<fn>\w+)\((?<params>[^)]*)\)\{return\{\.\.\.(?<state>\w+),account:(?<account>\w+)\}\}",
-                                RegexOptions.Singleline),
-                            PatchFactory = BuildSetAccountReducerPatch
-                        },
-                        new PatchEntry
-                        {
-                            // Wand's native "connect phone" pairing (POST /v3/auth/remote_code)
-                            // triggers a server-side device handoff that deauthorizes this desktop
-                            // session - the reported "entered the mobile activation key and got
-                            // signed out" bug. Neutralize the code issuer so native pairing can
-                            // never start. The injected remote panel is independent of this flow
-                            // (IPC bridge, not Wand's Pusher pairing) and keeps working. The
-                            // rejection is swallowed by the caller's try/catch (renders no code).
-                            Name = "disableNativeRemotePairing",
-                            SearchHints = new[] { "requestRemoteAuthCode", "/v3/auth/remote_code" },
-                            Target = new Regex(@"requestRemoteAuthCode\(\)\{return this\.#[\w$]+\.post\(""/v3/auth/remote_code""\)\}"),
-                            Patch = "requestRemoteAuthCode(){return Promise.reject(new Error(\"wand-enhancer: native mobile pairing disabled\"))}"
-                        }
-                    }
+                        Placeholder = "<service_name>"
+                    },
+                    Name = "getUserAccount",
+                    Target = new Regex(@"getUserAccount\(\)\{.*?return\s+this\.#\w+\.fetch\(\{.*?\}\)\}",
+                        RegexOptions.Singleline),
+                    Patch =
+                        "getUserAccount(){return this.#<service_name>.fetch({endpoint:\"/v3/account\",method:\"GET\",name:\"/v3/account\",collectMetrics:0}).then(response=>{response.subscription={period:\"yearly\",state:\"active\"};return response;})}"
                 },
+                new PatchEntry
                 {
-                    EPatchType.DisableUpdates,
-                    new[]
+                    SearchHints = new[] { "setAccountWandBrandExperience()", "/v3/account/brand_experience_wand" },
+                    Resolver = new ResolveContext
                     {
-                        // Regex consumes 4 closing parens (`)))) `); the 5th (registerHandler's own close)
-                        // remains in the original file after replacement. Patch must end with 3 parens — NOT 4.
-                        new PatchEntry
+                        Handler = (targetFunction) =>
                         {
-                            CandidateFileNames = new[] { "index.js" },
-                            SearchHints = new[] { "ACTION_CHECK_FOR_UPDATE" },
-                            Target = new Regex(@"registerHandler\(""ACTION_CHECK_FOR_UPDATE"".*?\)\)\)\)",
-                                RegexOptions.Singleline),
-                            Patch = "registerHandler(\"ACTION_CHECK_FOR_UPDATE\",(e=>expectUpdateFeedUrl(e,(e=>null)))"
-                        }
-                    }
+                            var match = Regex.Match(targetFunction, @"return\s+this\.#(\w+)\.post");
+                            return match.Success ? match.Groups[1].Value : null;
+                        },
+                        Placeholder = "<service_name>"
+                    },
+                    Name = "setAccountWandBrandExperience",
+                    Target = new Regex(
+                        @"setAccountWandBrandExperience\(\)\{.*?return\s+this\.#\w+\.post\(""/v3/account/brand_experience_wand""\)\}",
+                        RegexOptions.Singleline),
+                    Patch =
+                        "setAccountWandBrandExperience(){return this.#<service_name>.post(\"/v3/account/brand_experience_wand\").then(response=>{response.subscription={period:\"yearly\",state:\"active\"};return response;})}"
                 },
+                new PatchEntry
                 {
-                    EPatchType.DevToolsOnF12,
-                    new[]
-                    {
-                        new PatchEntry
-                        {
-                            Name = "devToolsBeforeInputEvent",
-                            CandidateFileNames = new[] { "index.js" },
-                            SearchHints = new[] { "whenReady().then(" },
-                            // Anchor on the Electron main-process `<app>.whenReady().then(`
-                            // call. This site is far more stable than the minified renderer
-                            // keydown listener that previously held the F12 -> ACTION_OPEN_DEV_TOOLS
-                            // dispatch (its identifiers and shape change on every Wand release).
-                            // We attach a `before-input-event` hook to every BrowserWindow's
-                            // webContents which toggles DevTools on F12 directly from the main
-                            // process, bypassing the renderer dispatcher entirely.
-                            Target = new Regex(@"(?<app>\w+)\.whenReady\(\)\.then\("),
-                            Patch = "${app}.on(\"browser-window-created\",((_,w)=>{try{w.webContents.on(\"before-input-event\",((_,i)=>{if(\"F12\"===i.key&&\"keyDown\"===i.type){w.webContents.isDevToolsOpened()?w.webContents.closeDevTools():w.webContents.openDevTools({mode:\"detach\"})}}))}catch(e){}})),${app}.whenReady().then("
-                        }
-                    }
+                    Name = "setAccountLanguage",
+                    SearchHints = new[] { "setAccountLanguage(", "/v3/account/language" },
+                    Target = new Regex(
+                        @"setAccountLanguage\((?<params>[^)]*)\)\{\s*return\s+(?<expr>this\.#\w+\.post\(""/v3/account/language"",\{[^}]*\}\))\s*;?\s*\}",
+                        RegexOptions.Singleline),
+                    PatchFactory = BuildSetAccountLanguagePatch
                 },
+                new PatchEntry
                 {
-                    EPatchType.RemoteWebPanelPreview,
-                    new[]
-                    {
-                        new PatchEntry
-                        {
-                            Name = "remoteBridgeMainBoot",
-                            CandidateFileNames = new[] { "index.js" },
-                            SearchHints = new[] { "whenReady().then(run)" },
-                            Target = new Regex(@"(?<app>\w+)\.whenReady\(\)\.then\(run\)"),
-                            Patch = "${app}.whenReady().then(()=>{try{const p=require(\"node:path\");require(p.join(__dirname,\"remote-panel\",\"bridge.cjs\")).installWandRuntime(require(\"electron\"));}catch(e){try{const fs=require(\"node:fs\"),os=require(\"node:os\"),p=require(\"node:path\");fs.appendFileSync(p.join(os.tmpdir(),\"wand-remote-bridge.log\"),\"[\"+new Date().toISOString()+\"] [boot-error] \"+(e&&e.stack||e)+\"\\n\");}catch(_){}}return run()})"
-                        },
-                        new PatchEntry
-                        {
-                            Name = "remoteBridgeReset",
-                            SearchHints = new[] { "client-state" },
-                            Target = new Regex(@"(?<method>#[\w$]+)\(\)\s*\{\s*(?<body>(?:(?!__wandRemoteBridge|}\s*#[\w$]+\(\)).)*?Date\.now\(\)\.toString\(\)(?:(?!__wandRemoteBridge|}\s*#[\w$]+\(\)).)*?\[\](?:(?!__wandRemoteBridge|}\s*#[\w$]+\(\)).)*?)\s*\}\s*(?=#[\w$]+\(\)\s*\{\s*if\s*\(\s*this\.status\s*===\s*[\w$]+\.Connected\s*\).*?""client-state"")",
-                                RegexOptions.Singleline),
-                            PatchFactory = BuildRemoteBridgeResetPatch
-                        },
-                        new PatchEntry
-                        {
-                            Name = "remoteBridgeSyncSnapshot",
-                            SearchHints = new[] { "client-state" },
-                            Target = new Regex(@"(?<method>#[\w$]+)\(\)\s*\{\s*if\s*\(\s*this\.status\s*===\s*[\w$]+\.Connected\s*\)\s*\{(?<body>.*?""client-state"".*?isTimeLimitExpired\s*:\s*""expired""\s*===\s*this\.\#[\w$]+\.timerState.*?\)\s*;?\s*\)?\s*;?)\s*\}\s*\}(?=\s*#[\w$]+\(\)\s*\{\s*if\s*\(\s*!this\.\#[\w$]+\?\.\s*isActive\(\)\s*\)\s*return\s*null)",
-                                RegexOptions.Singleline),
-                            PatchFactory = BuildRemoteBridgeSyncSnapshotPatch
-                        },
-                        new PatchEntry
-                        {
-                            // Inject the bridge init + setHandler right after the method's opening
-                            // brace; the rest of setCurrentTrainer is left untouched. Only `${trainer}`
-                            // (active-trainer field) and `${remoteSource}` (value-source enum, taken
-                            // via lookahead from the sole `e.source!==` site) vary between builds and
-                            // are resolved from the match — nothing is hardcoded.
-                            Name = "remoteBridgeBindHandler",
-                            SearchHints = new[] { "client-state" },
-                            Target = new Regex(@"(?<head>setCurrentTrainer\(e,t=null\)\{)(?=const s=e\?\.trainerId\|\|null,i=\(s\?e\?\.gameId:null\)\|\|null,n=\(s\?e\?\.supportedVersions:null\)\|\|\[\];if\(s===this\.#[\w$]+&&t===this\.(?<trainer>#[\w$]+)\)return;)(?=.*?e\.source!==(?<remoteSource>[\w$]+\.[\w$]+\.Remote))",
-                                RegexOptions.Singleline),
-                            Patch = "${head}this.__wandRemoteBridge||(this.__wandRemoteBridge=(()=>{try{const r=globalThis.require||require;const{ipcRenderer:c}=r(\"electron\");try{c.invoke(\"wand-remote-url\").then((u=>{u&&(globalThis.__wandRemoteBridgeUrl=u)}))}catch(e){}const send=(ch,p)=>{try{return c.invoke(ch,p&&JSON.parse(JSON.stringify(p)))}catch(e){}};return{sync:(s)=>send(\"wand-remote-sync\",s),valueChanged:(s)=>send(\"wand-remote-value-changed\",s),setHandler:(h)=>{if(this.__wandRemoteBridgeBound)return;this.__wandRemoteBridgeBound=true;try{c.invoke(\"wand-remote-set-handler-bind\")}catch(e){}c.on(\"wand-remote-set-value\",(_e,req)=>{try{h(req)}catch(e){}})}}}catch(e){try{const r=globalThis.require||require,fs=r(\"node:fs\"),os=r(\"node:os\"),p=r(\"node:path\");fs.appendFileSync(p.join(os.tmpdir(),\"wand-remote-bridge.log\"),\"[\"+new Date().toISOString()+\"] [renderer-bind-error] \"+(e&&e.stack||e)+\"\\n\");}catch(_){}return null}})());this.__wandRemoteBridge?.setHandler((e=>{if(!this.${trainer}||!e?.target)return!1;return this.${trainer}.isActive()?this.${trainer}.setValue(e.target,e.value,${remoteSource},e.cheatId):!1}));this.__wandRemoteTrainerInfo=e??null;"
-                        },
-                        new PatchEntry
-                        {
-                            // Pure insertion: splice one `valueChanged` bridge call in after the
-                            // existing `client-value-changed` send, before the onValueSet callback
-                            // closes. Resolves no private names — `${head}`/`${tail}` carry the
-                            // original text verbatim. trainerId is omitted from the payload;
-                            // bridge-state falls back to the active snapshot trainer.
-                            Name = "remoteBridgeValueDelta",
-                            SearchHints = new[] { "client-value-changed" },
-                            Target = new Regex(@"(?<head>#[\w$]+\(e,t\)\{t\.push\(e\.onValueSet\(e=>\{this\.status===[\w$]+\.Connected&&e\.source!==[\w$]+\.[\w$]+\.Remote&&this\.#[\w$]+\?\.send\(""client-value-changed"",\{instanceId:this\.#[\w$]+,name:e\.name,value:e\.value,cheatId:e\.cheatId\}\))(?<tail>\}\)\),this\.#[\w$]+\(\)\})"),
-                            Patch = "${head},this.__wandRemoteBridge?.valueChanged({target:e.name,value:e.value,oldValue:e.oldValue,source:String(e.source??\"desktop\"),cheatId:e.cheatId})${tail}"
-                        }
-                    }
+                    Name = "setAccountReducer",
+                    SearchHints = new[] { "ACTION_SET_ACCOUNT" },
+                    Target = new Regex(
+                        @"const (?<decl>\w+)=""ACTION_SET_ACCOUNT"";function (?<fn>\w+)\((?<params>[^)]*)\)\{return\{\.\.\.(?<state>\w+),account:(?<account>\w+)\}\}",
+                        RegexOptions.Singleline),
+                    PatchFactory = BuildSetAccountReducerPatch
+                },
+                new PatchEntry
+                {
+                    Name = "disableNativeRemotePairing",
+                    SearchHints = new[] { "requestRemoteAuthCode", "/v3/auth/remote_code" },
+                    Target = new Regex(@"requestRemoteAuthCode\(\)\{return this\.#[\w$]+\.post\(""/v3/auth/remote_code""\)\}"),
+                    Patch = "requestRemoteAuthCode(){return Promise.reject(new Error(\"wand-enhancer: native mobile pairing disabled\"))}"
+                }
+            };
+        }
+
+        private static PatchEntry[] GetDisableUpdatesEntries()
+        {
+            return new[]
+            {
+                new PatchEntry
+                {
+                    CandidateFileNames = new[] { "index.js" },
+                    SearchHints = new[] { "ACTION_CHECK_FOR_UPDATE" },
+                    Target = new Regex(@"registerHandler\(""ACTION_CHECK_FOR_UPDATE"".*?\)\)\)\)",
+                        RegexOptions.Singleline),
+                    Patch = "registerHandler(\"ACTION_CHECK_FOR_UPDATE\",(e=>expectUpdateFeedUrl(e,(e=>null)))"
+                }
+            };
+        }
+
+        private static PatchEntry[] GetDevToolsOnF12Entries()
+        {
+            return new[]
+            {
+                new PatchEntry
+                {
+                    Name = "devToolsBeforeInputEvent",
+                    CandidateFileNames = new[] { "index.js" },
+                    SearchHints = new[] { "whenReady().then(" },
+                    Target = new Regex(@"(?<app>\w+)\.whenReady\(\)\.then\("),
+                    Patch = "${app}.on(\"browser-window-created\",((_,w)=>{try{w.webContents.on(\"before-input-event\",((_,i)=>{if(\"F12\"===i.key&&\"keyDown\"===i.type){w.webContents.isDevToolsOpened()?w.webContents.closeDevTools():w.webContents.openDevTools({mode:\"detach\"})}}))}catch(e){}})),${app}.whenReady().then("
+                }
+            };
+        }
+
+        private static PatchEntry[] GetRemoteWebPanelEntries()
+        {
+            return new[]
+            {
+                new PatchEntry
+                {
+                    Name = "remoteBridgeMainBoot",
+                    CandidateFileNames = new[] { "index.js" },
+                    SearchHints = new[] { "whenReady().then(run)" },
+                    Target = new Regex(@"(?<app>\w+)\.whenReady\(\)\.then\(run\)"),
+                    Patch = "${app}.whenReady().then(()=>{try{const p=require(\"node:path\");require(p.join(__dirname,\"remote-panel\",\"bridge.cjs\")).installWandRuntime(require(\"electron\"));}catch(e){try{const fs=require(\"node:fs\"),os=require(\"node:os\"),p=require(\"node:path\");fs.appendFileSync(p.join(os.tmpdir(),\"wand-remote-bridge.log\"),\"[\"+new Date().toISOString()+\"] [boot-error] \"+(e&&e.stack||e)+\"\\n\");}catch(_){}}return run()})"
+                },
+                new PatchEntry
+                {
+                    Name = "remoteBridgeReset",
+                    SearchHints = new[] { "client-state" },
+                    Target = new Regex(@"(?<method>#[\w$]+)\(\)\s*\{\s*(?<body>(?:(?!__wandRemoteBridge|}\s*#[\w$]+\(\)).)*?Date\.now\(\)\.toString\(\)(?:(?!__wandRemoteBridge|}\s*#[\w$]+\(\)).)*?\[\](?:(?!__wandRemoteBridge|}\s*#[\w$]+\(\)).)*?)\s*\}\s*(?=#[\w$]+\(\)\s*\{\s*if\s*\(\s*this\.status\s*===\s*[\w$]+\.Connected\s*\).*?""client-state"")",
+                        RegexOptions.Singleline),
+                    PatchFactory = BuildRemoteBridgeResetPatch
+                },
+                new PatchEntry
+                {
+                    Name = "remoteBridgeSyncSnapshot",
+                    SearchHints = new[] { "client-state" },
+                    Target = new Regex(@"(?<method>#[\w$]+)\(\)\s*\{\s*if\s*\(\s*this\.status\s*===\s*[\w$]+\.Connected\s*\)\s*\{(?<body>.*?""client-state"".*?isTimeLimitExpired\s*:\s*""expired""\s*===\s*this\.\#[\w$]+\.timerState.*?\)\s*;?\s*\)?\s*;?)\s*\}\s*\}(?=\s*#[\w$]+\(\)\s*\{\s*if\s*\(\s*!this\.\#[\w$]+\?\.\s*isActive\(\)\s*\)\s*return\s*null)",
+                        RegexOptions.Singleline),
+                    PatchFactory = BuildRemoteBridgeSyncSnapshotPatch
+                },
+                new PatchEntry
+                {
+                    Name = "remoteBridgeBindHandler",
+                    SearchHints = new[] { "client-state" },
+                    Target = new Regex(@"(?<head>setCurrentTrainer\(e,t=null\)\{)(?=const s=e\?\.trainerId\|\|null,i=\(s\?e\?\.gameId:null\)\|\|null,n=\(s\?e\?\.supportedVersions:null\)\|\|\[\];if\(s===this\.#[\w$]+&&t===this\.(?<trainer>#[\w$]+)\)return;)(?=.*?e\.source!==(?<remoteSource>[\w$]+\.[\w$]+\.Remote))",
+                        RegexOptions.Singleline),
+                    Patch = "${head}this.__wandRemoteBridge||(this.__wandRemoteBridge=(()=>{try{const r=globalThis.require||require;const{ipcRenderer:c}=r(\"electron\");try{c.invoke(\"wand-remote-url\").then((u=>{u&&(globalThis.__wandRemoteBridgeUrl=u)}))}catch(e){}const send=(ch,p)=>{try{return c.invoke(ch,p&&JSON.parse(JSON.stringify(p)))}catch(e){}};return{sync:(s)=>send(\"wand-remote-sync\",s),valueChanged:(s)=>send(\"wand-remote-value-changed\",s),setHandler:(h)=>{if(this.__wandRemoteBridgeBound)return;this.__wandRemoteBridgeBound=true;try{c.invoke(\"wand-remote-set-handler-bind\")}catch(e){}c.on(\"wand-remote-set-value\",(_e,req)=>{try{h(req)}catch(e){}})}}}catch(e){try{const r=globalThis.require||require,fs=r(\"node:fs\"),os=r(\"node:os\"),p=r(\"node:path\");fs.appendFileSync(p.join(os.tmpdir(),\"wand-remote-bridge.log\"),\"[\"+new Date().toISOString()+\"] [renderer-bind-error] \"+(e&&e.stack||e)+\"\\n\");}catch(_){}return null}})());this.__wandRemoteBridge?.setHandler((e=>{if(!this.${trainer}||!e?.target)return!1;return this.${trainer}.isActive()?this.${trainer}.setValue(e.target,e.value,${remoteSource},e.cheatId):!1}));this.__wandRemoteTrainerInfo=e??null;"
+                },
+                new PatchEntry
+                {
+                    Name = "remoteBridgeValueDelta",
+                    SearchHints = new[] { "client-value-changed" },
+                    Target = new Regex(@"(?<head>#[\w$]+\(e,t\)\{t\.push\(e\.onValueSet\(e=>\{this\.status===[\w$]+\.Connected&&e\.source!==[\w$]+\.[\w$]+\.Remote&&this\.#[\w$]+\?\.send\(""client-value-changed"",\{instanceId:this\.#[\w$]+,name:e\.name,value:e\.value,cheatId:e\.cheatId\}\))(?<tail>\}\)\),this\.#[\w$]+\(\)\})"),
+                    Patch = "${head},this.__wandRemoteBridge?.valueChanged({target:e.name,value:e.value,oldValue:e.oldValue,source:String(e.source??\"desktop\"),cheatId:e.cheatId})${tail}"
                 }
             };
         }

@@ -12,7 +12,7 @@ namespace WandEnhancer.Core.Tests
         [Test]
         public async Task LocateAsync_WithConfiguredPath_ReturnsInfo()
         {
-            var tempDir = CreateFakeWandDir();
+            var tempDir = TestHelpers.CreateFakeWandDir();
             try
             {
                 var locator = new WeModLocator(PathExtensions.CheckWeModPath, allowManualFallback: false);
@@ -36,14 +36,5 @@ namespace WandEnhancer.Core.Tests
                 Assert.AreNotEqual(bogusPath, info.BasePath, "Locator returned the invalid configured path as a valid install");
         }
 
-        private static string CreateFakeWandDir()
-        {
-            var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
-            Directory.CreateDirectory(path);
-            File.WriteAllText(Path.Combine(path, "Wand.exe"), "fake");
-            Directory.CreateDirectory(Path.Combine(path, "resources"));
-            File.WriteAllText(Path.Combine(path, "resources", "app.asar"), "fake");
-            return path;
-        }
     }
 }

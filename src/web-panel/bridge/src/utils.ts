@@ -42,6 +42,7 @@ function isValidPort(value) {
     return Number.isFinite(value) && value > 0 && value < 65536;
 }
 
+// Intentional copy of runtime.js toStringId — the renderer script cannot import modules.
 function toStringId(value) {
     if (typeof value === 'string' && value.trim()) {
         return value.trim();

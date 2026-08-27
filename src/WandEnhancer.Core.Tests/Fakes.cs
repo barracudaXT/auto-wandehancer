@@ -1,10 +1,24 @@
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using WandEnhancer.Core.Models;
 using WandEnhancer.Core.Services;
 
 namespace WandEnhancer.Core.Tests
 {
+    internal static class TestHelpers
+    {
+        public static string CreateFakeWandDir()
+        {
+            var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(path);
+            File.WriteAllText(Path.Combine(path, "Wand.exe"), "fake");
+            Directory.CreateDirectory(Path.Combine(path, "resources"));
+            File.WriteAllText(Path.Combine(path, "resources", "app.asar"), "fake");
+            return path;
+        }
+    }
+
     internal class FakeWeModLocator : IWeModLocator
     {
         private readonly WeModInfo _info;

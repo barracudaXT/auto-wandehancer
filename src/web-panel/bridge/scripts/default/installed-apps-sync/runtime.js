@@ -193,6 +193,7 @@ export function getBasename(location) {
   return leaf ? leaf.trim() : ""
 }
 
+// Intentional copy of utils.ts toStringId — this renderer script cannot import modules.
 export function toStringId(value) {
   if (typeof value === "string" && value.trim()) {
     return value.trim()

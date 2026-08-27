@@ -1,7 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Net;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using WandEnhancer.Core.Services;
@@ -10,6 +10,8 @@ namespace WandEnhancer.AutoPatch
 {
     public class UpdateInstaller
     {
+        private static readonly HttpClient HttpClient = CreateHttpClient();
+
         private readonly ILogger _logger;
         private readonly INotificationService _notification;
 
@@ -36,18 +38,29 @@ namespace WandEnhancer.AutoPatch
                 _logger.Info($"Downloading update {update.TagName} from {update.DownloadUrl}");
                 _notification.ShowInfo("WandEnhancer", $"Downloading update {update.TagName}...");
 
-                using (var client = new WebClient())
+                using (var response = await HttpClient.GetAsync(update.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, token))
                 {
-                    client.Headers.Add("User-Agent", "WandEnhancer-AutoUpdate");
+                    response.EnsureSuccessStatusCode();
+                    var totalBytes = response.Content.Headers.ContentLength;
 
-                    if (progress != null)
+                    using (var contentStream = await response.Content.ReadAsStreamAsync())
+                    using (var fileStream = new FileStream(installerPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
                     {
-                        client.DownloadProgressChanged += (s, e) => progress.Report(e.ProgressPercentage);
-                    }
+                        var buffer = new byte[8192];
+                        long bytesRead = 0;
+                        int read;
 
-                    using (token.Register(() => client.CancelAsync()))
-                    {
-                        await client.DownloadFileTaskAsync(new Uri(update.DownloadUrl), installerPath);
+                        while ((read = await contentStream.ReadAsync(buffer, 0, buffer.Length, token)) > 0)
+                        {
+                            await fileStream.WriteAsync(buffer, 0, read, token);
+                            bytesRead += read;
+
+                            if (progress != null && totalBytes.HasValue && totalBytes.Value > 0)
+                            {
+                                var pct = (int)(bytesRead * 100 / totalBytes.Value);
+                                progress.Report(pct);
+                            }
+                        }
                     }
                 }
 
@@ -74,7 +87,7 @@ namespace WandEnhancer.AutoPatch
                 _logger.Info("Update download was cancelled.");
                 return false;
             }
-            catch (WebException ex)
+            catch (HttpRequestException ex)
             {
                 _logger.Error($"Update download failed: {ex.Message}");
                 _notification.ShowError("WandEnhancer", "Update download failed. Will retry later.");
@@ -86,6 +99,13 @@ namespace WandEnhancer.AutoPatch
                 _notification.ShowError("WandEnhancer", $"Update failed: {ex.Message}");
                 return false;
             }
+        }
+
+        private static HttpClient CreateHttpClient()
+        {
+            var client = new HttpClient();
+            client.DefaultRequestHeaders.Add("User-Agent", "WandEnhancer-AutoUpdate");
+            return client;
         }
     }
 }

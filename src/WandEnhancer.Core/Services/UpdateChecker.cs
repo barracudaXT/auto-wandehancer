@@ -1,5 +1,5 @@
 using System;
-using System.Net;
+using System.Net.Http;
 using System.Reflection;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
@@ -19,6 +19,8 @@ namespace WandEnhancer.Core.Services
         private const string ReleasesApiUrl =
             "https://api.github.com/repos/barracudaXT/auto-wandehancer/releases/latest";
 
+        private static readonly HttpClient HttpClient = CreateHttpClient();
+
         private readonly ILogger _logger;
 
         public UpdateChecker(ILogger logger)
@@ -35,13 +37,7 @@ namespace WandEnhancer.Core.Services
         {
             try
             {
-                string json;
-                using (var client = new WebClient())
-                {
-                    client.Headers.Add("User-Agent", "WandEnhancer-AutoUpdate");
-                    client.Headers.Add("Accept", "application/vnd.github.v3+json");
-                    json = await client.DownloadStringTaskAsync(new Uri(ReleasesApiUrl));
-                }
+                var json = await HttpClient.GetStringAsync(ReleasesApiUrl);
 
                 var release = JObject.Parse(json);
                 var tagName = release["tag_name"]?.ToString();
@@ -79,7 +75,7 @@ namespace WandEnhancer.Core.Services
                     TagName = tagName
                 };
             }
-            catch (WebException ex)
+            catch (HttpRequestException ex)
             {
                 _logger.Error($"Update check failed (network): {ex.Message}");
                 return null;
@@ -98,6 +94,14 @@ namespace WandEnhancer.Core.Services
 
             var current = GetCurrentVersion();
             return info.LatestVersion > current;
+        }
+
+        private static HttpClient CreateHttpClient()
+        {
+            var client = new HttpClient();
+            client.DefaultRequestHeaders.Add("User-Agent", "WandEnhancer-AutoUpdate");
+            client.DefaultRequestHeaders.Add("Accept", "application/vnd.github.v3+json");
+            return client;
         }
     }
 }
