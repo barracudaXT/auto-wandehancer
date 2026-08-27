@@ -9,8 +9,10 @@
              Foreground="{DynamicResource MutedForeground}"
              FontWeight="Medium"
              FontSize="13">
-    <Grid MinWidth="380">
+    <Grid MinWidth="430">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -42,7 +44,35 @@
                     Command="{Binding PickPathCommand}" />
         </Grid>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+        <TextBlock Grid.Row="2"
+                  Text="Activate WeMod Pro is always enabled. Choose additional enhancements:"
+                  FontSize="12"
+                  Foreground="{DynamicResource MutedForeground}"
+                  TextWrapping="Wrap"
+                  Margin="0 0 0 8" />
+
+        <Grid Grid.Row="3" Margin="0 0 0 15">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="27" />
+                <RowDefinition Height="27" />
+                <RowDefinition Height="27" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="{DynamicResource pv_devtools}" />
+            <CheckBox Grid.Row="0" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" IsChecked="{Binding DevToolsOnF12}" />
+
+            <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="{DynamicResource pv_disable_updates}" />
+            <CheckBox Grid.Row="1" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" IsChecked="{Binding DisableUpdates}" />
+
+            <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="{DynamicResource pv_remote_web_panel_preview}" />
+            <CheckBox Grid.Row="2" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" IsChecked="{Binding RemoteWebPanelPreview}" />
+        </Grid>
+
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 0 0 10">
             <Button Content="{DynamicResource autopatch_disable}"
                     Padding="10 4"
                     Margin="0 0 10 0"
@@ -53,5 +83,12 @@
                     Style="{StaticResource ColoredButton}"
                     Command="{Binding EnableCommand}" />
         </StackPanel>
+
+        <TextBlock Grid.Row="5"
+                  Text="Changes are saved when you click Enable."
+                  FontSize="11"
+                  Foreground="{DynamicResource MutedForeground}"
+                  Opacity="0.8"
+                  HorizontalAlignment="Right" />
     </Grid>
 </UserControl>

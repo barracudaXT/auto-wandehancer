@@ -18,10 +18,11 @@ namespace WandEnhancer.Utils
             var info = locator.LocateAsync().GetAwaiter().GetResult();
             if (info == null) return null;
 
+            var exeName = System.IO.Path.GetFileName(info.ExecutablePath);
             return new WeModConfig
             {
                 BrandName = "Wand",
-                ExecutableName = "Wand.exe",
+                ExecutableName = exeName,
                 RootDirectory = info.BasePath
             };
         }

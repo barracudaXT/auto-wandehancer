@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using WandEnhancer.Core.Extensions;
 using WandEnhancer.Core.Models;
 
 namespace WandEnhancer.Core.Services
@@ -21,14 +22,21 @@ namespace WandEnhancer.Core.Services
             return Task.Run(() =>
             {
                 _logger($"Starting patch for Wand at {info.BasePath}", ELogType.Info);
+                var exeName = System.IO.Path.GetFileName(info.ExecutablePath);
+                if (string.IsNullOrWhiteSpace(exeName) || !System.IO.File.Exists(info.ExecutablePath))
+                {
+                    exeName = PathExtensions.GetWeModExecutableName(info.BasePath) ?? "Wand.exe";
+                }
+
                 var weModConfig = new WeModConfig
                 {
                     BrandName = "Wand",
-                    ExecutableName = "Wand.exe",
+                    ExecutableName = exeName,
                     RootDirectory = info.BasePath
                 };
                 var enhancer = new Enhancer(weModConfig, _logger, config);
                 enhancer.Patch();
+                config.PatchingCompleted = true;
                 _logger("Patch completed successfully.", ELogType.Info);
             });
         }

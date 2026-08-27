@@ -1,5 +1,11 @@
-# Superpowers session ledger
-.superpowers/sdd/
+# Tool-generated
+.superpowers/
+.codegraph/
+.hermes/
+.tokensave/
+.claude/
+docs/superpowers/
+AGENTS.md
 
 # Build outputs
 *.exe
@@ -24,3 +30,9 @@ dist/
 # Temporary build artifacts
 .tmp/
 .vs/
+
+# Project-specific
+appsettings.json
+.source
+*DotSettings.user
+web-panel/bridge/wand-remote-bridge.cjs

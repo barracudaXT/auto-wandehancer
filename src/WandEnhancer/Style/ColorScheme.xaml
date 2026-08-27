@@ -16,6 +16,7 @@
     <Brush x:Key="AccentForeground">#FAFAFA</Brush>
     <Brush x:Key="Destructive">Red</Brush>
     <Brush x:Key="DestructiveForeground">#FAFAFA</Brush>
+    <Brush x:Key="Success">#22c55e</Brush>
     <Brush x:Key="Border">#27272A</Brush>
     <Brush x:Key="Input">#27272A</Brush>
     <Brush x:Key="Ring">#D4D4D8</Brush>

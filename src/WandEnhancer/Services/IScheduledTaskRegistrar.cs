@@ -4,5 +4,6 @@ namespace WandEnhancer.Services
     {
         void Create(string wandPath, string autoPatchExePath);
         void Delete();
+        bool Exists();
     }
 }

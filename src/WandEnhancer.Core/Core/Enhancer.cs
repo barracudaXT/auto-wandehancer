@@ -23,9 +23,6 @@ namespace WandEnhancer.Core
         private const string RemoteBridgeTargetFileName = "bridge.cjs";
         private const string RemoteRendererScriptsDirectoryName = "renderer-scripts";
         private const string EmbeddedRemotePanelDistPrefix = "remote-panel/dist/";
-        private const string AppBundleFilePrefix = "app-";
-        private const string AppBundleFileSuffix = ".bundle.js";
-        private const string IndexBundleFileName = "index.js";
         private const string JavaScriptFileExtension = ".js";
         private const string JavaScriptFileSearchPattern = "*.js";
         private const string DuplicateScriptSuffix = ".custom";
@@ -51,178 +48,19 @@ namespace WandEnhancer.Core
             _unpackedBackupPath = Path.Combine(weModConfig.RootDirectory, ResourcesDirectoryName, AppAsarUnpackedBackupDirectoryName);
         }
         
-        private string ApplyJsPatch(string fileName, string js, EnhancerConfig.PatchEntry patch, EPatchType patchType, out bool patchApplied)
-        {
-            patchApplied = false;
-
-            if (patch.Applied)
-            {
-                return js;
-            }
-
-            if (!CanSearchPatchInFile(fileName, patch) || !ContainsSearchHint(js, patch.SearchHints))
-            {
-                return js;
-            }
-            
-            var match = patch.Target.Match(js);
-            if (!match.Success)
-            {
-                return js;
-            }
-            
-            var prefix = $"[ENHANCER] [{patchType} -> {patch.Name}]";
-            
-            if(patch.SingleMatch && match.NextMatch().Success)
-            {
-                throw new Exception(
-                    $"{prefix} Patch failed. Multiple target functions found. Looks like the version is not supported");
-            }
-
-            string patchSource = patch.PatchFactory != null
-                ? patch.PatchFactory(match)
-                : patch.Patch;
-
-            if (patch.Resolver != null)
-            {
-                string resolvedField = patch.Resolver.Handler(match.Value);
-                if (string.IsNullOrEmpty(resolvedField))
-                {
-                    throw new Exception($"{prefix} Resolver failed to find field name");
-                }
-                
-                patchSource = patchSource.Replace(patch.Resolver.Placeholder, resolvedField);
-            }
-            
-            _logger($"{prefix} Found target function in: " + Path.GetFileName(fileName), ELogType.Info);
-
-            string newJs;
-            if (patch.PatchFactory != null)
-            {
-                newJs = patch.SingleMatch
-                    ? patch.Target.Replace(js, _ => patchSource, 1)
-                    : patch.Target.Replace(js, _ => patchSource);
-            }
-            else
-            {
-                newJs = patch.SingleMatch
-                    ? patch.Target.Replace(js, patchSource, 1)
-                    : patch.Target.Replace(js, patchSource);
-            }
-
-            _logger($"{prefix} Patch applied", ELogType.Success);
-            patch.Applied = true;
-            patchApplied = true;
-            
-            return newJs;
-        }
-
         private void PatchAsar()
         {
-            var items = Directory.EnumerateFiles(_unpackedPath, $"*{JavaScriptFileExtension}", SearchOption.TopDirectoryOnly)
-                .Where(IsCandidateBundleFile)
-                .ToList();
+            var result = PatchEngine.ApplyPatches(
+                _unpackedPath,
+                new HashSet<EPatchType>(_config.PatchTypes),
+                _logger,
+                writeResults: true);
 
-            if (!items.Any())
+            if (!result.AllPatchesApplied)
             {
-                throw new Exception("[ENHANCER] No app bundle found");
-            }
-            
-            var remainingPatches = new HashSet<EPatchType>(_config.PatchTypes);
-            var enhancerConfig = EnhancerConfig.GetInstance();
-
-            foreach (var item in items)
-            {
-                if (remainingPatches.Count == 0)
-                {
-                    break;
-                }
-
-                if (!CouldFileContainRemainingPatch(item, remainingPatches, enhancerConfig))
-                {
-                    continue;
-                }
-                
-                string data = File.ReadAllText(item);
-                bool fileChanged = false;
-                
-                foreach (var entry in remainingPatches.ToList())
-                {
-                    var entries = enhancerConfig[entry];
-                    foreach (var patchEntry in entries)
-                    {
-                        bool patchApplied;
-                        data = ApplyJsPatch(item, data, patchEntry, entry, out patchApplied);
-                        fileChanged = fileChanged || patchApplied;
-                    }
-
-                    if (entries.All(x => x.Applied))
-                    {
-                        remainingPatches.Remove(entry);
-                    }
-                }
-
-                if (fileChanged)
-                {
-                    File.WriteAllText(item, data);
-                }
-            }
-            
-            if(remainingPatches.Count > 0)
-            {
-                var failedPatches = string.Join(", ", remainingPatches.Select(p => p.ToString()));
+                var failedPatches = string.Join(", ", result.RemainingPatches.Select(p => p.ToString()));
                 throw new Exception($"[ENHANCER] Failed to apply patches: {failedPatches}. The version may not be supported.");
             }
-        }
-
-        private static bool IsCandidateBundleFile(string filePath)
-        {
-            string fileName = Path.GetFileName(filePath);
-            return fileName.Equals(IndexBundleFileName, StringComparison.OrdinalIgnoreCase)
-                || (fileName.StartsWith(AppBundleFilePrefix, StringComparison.OrdinalIgnoreCase)
-                    && fileName.EndsWith(AppBundleFileSuffix, StringComparison.OrdinalIgnoreCase));
-        }
-
-        private static bool CouldFileContainRemainingPatch(string filePath, IEnumerable<EPatchType> remainingPatches, Dictionary<EPatchType, EnhancerConfig.PatchEntry[]> enhancerConfig)
-        {
-            foreach (var patchType in remainingPatches)
-            {
-                foreach (var patchEntry in enhancerConfig[patchType])
-                {
-                    if (patchEntry.Applied)
-                    {
-                        continue;
-                    }
-
-                    if (CanSearchPatchInFile(filePath, patchEntry))
-                    {
-                        return true;
-                    }
-                }
-            }
-
-            return false;
-        }
-
-        private static bool CanSearchPatchInFile(string filePath, EnhancerConfig.PatchEntry patch)
-        {
-            if (patch.CandidateFileNames == null || patch.CandidateFileNames.Length == 0)
-            {
-                return true;
-            }
-
-            string fileName = Path.GetFileName(filePath);
-            return patch.CandidateFileNames.Any(candidate => fileName.Equals(candidate, StringComparison.OrdinalIgnoreCase));
-        }
-
-        private static bool ContainsSearchHint(string source, string[] searchHints)
-        {
-            if (searchHints == null || searchHints.Length == 0)
-            {
-                return true;
-            }
-
-            return searchHints.Any(searchHint => source.IndexOf(searchHint, StringComparison.Ordinal) >= 0);
         }
 
         private static string FindWorkspacePath(params string[] segments)

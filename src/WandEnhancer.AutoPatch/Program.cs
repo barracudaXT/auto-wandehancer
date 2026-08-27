@@ -54,111 +54,117 @@ namespace WandEnhancer.AutoPatch
         {
             using (var notification = new NotificationService())
             using (var window = new ProgressWindow())
-            using (var retrySignal = new SemaphoreSlim(0, 1))
             {
-                var patchController = new PatchModeController(settingsStore, locator, processManager, patcher, logger, notification);
-                var retryLock = new object();
-                var retryRequested = false;
-                var stop = false;
-                var openMainInvoked = false;
-                var attemptCount = 0;
-                var doneTcs = new TaskCompletionSource<object>();
+                // Ensure the window handle is created before the background task
+                // tries to Invoke status updates onto the UI thread.
+                var dummyHandle = window.Handle;
 
-                Action wakeRetrySignal = () =>
+                using (var retrySignal = new SemaphoreSlim(0, 1))
                 {
-                    try { retrySignal.Release(); } catch (SemaphoreFullException) { }
-                };
+                    var patchController = new PatchModeController(settingsStore, locator, processManager, patcher, logger, notification);
+                    var retryLock = new object();
+                    var retryRequested = false;
+                    var stop = false;
+                    var openMainInvoked = false;
+                    var attemptCount = 0;
+                    var doneTcs = new TaskCompletionSource<object>();
 
-                window.FormClosed += (s, e) =>
-                {
-                    stop = true;
-                    doneTcs.TrySetResult(null);
-                    wakeRetrySignal();
-                };
-
-                window.OpenMainRequested += (s, e) =>
-                {
-                    if (openMainInvoked)
-                        return;
-                    openMainInvoked = true;
-
-                    try
+                    Action wakeRetrySignal = () =>
                     {
-                        OpenMainApplication();
-                    }
-                    catch (Exception ex)
+                        try { retrySignal.Release(); } catch (SemaphoreFullException) { }
+                    };
+
+                    window.FormClosed += (s, e) =>
                     {
-                        logger.Error($"Open main application failed: {ex}");
-                    }
-                    stop = true;
-                    doneTcs.TrySetResult(null);
-                    window.SafeClose();
-                    wakeRetrySignal();
-                };
+                        stop = true;
+                        doneTcs.TrySetResult(null);
+                        wakeRetrySignal();
+                    };
 
-                window.RetryRequested += (s, e) =>
-                {
-                    lock (retryLock)
+                    window.OpenMainRequested += (s, e) =>
                     {
-                        retryRequested = true;
-                        if (retrySignal.CurrentCount == 0)
-                            retrySignal.Release();
-                    }
-                };
-
-                retrySignal.Release(); // initial attempt
-
-#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
-                Task.Run(async () =>
-                {
-                    while (!stop)
-                    {
-                        await retrySignal.WaitAsync();
-
-                        lock (retryLock)
-                        {
-                            retryRequested = false;
-                        }
-
-                        attemptCount++;
-                        if (attemptCount > 3)
-                        {
-                            logger.Error("Maximum auto-patch retry attempts exceeded.");
-                            break;
-                        }
+                        if (openMainInvoked)
+                            return;
+                        openMainInvoked = true;
 
                         try
                         {
-                            var success = await patchController.RunAsync(path, new Progress<string>(m => window.SetStatus(m)), window);
-                            if (success || stop)
-                                break;
+                            OpenMainApplication();
                         }
                         catch (Exception ex)
                         {
-                            logger.Error($"Patch attempt failed: {ex}");
+                            logger.Error($"Open main application failed: {ex}");
                         }
+                        stop = true;
+                        doneTcs.TrySetResult(null);
+                        window.SafeClose();
+                        wakeRetrySignal();
+                    };
 
-                        if (stop)
-                            break;
-
+                    window.RetryRequested += (s, e) =>
+                    {
                         lock (retryLock)
                         {
-                            if (retryRequested)
+                            retryRequested = true;
+                            if (retrySignal.CurrentCount == 0)
+                                retrySignal.Release();
+                        }
+                    };
+
+                    retrySignal.Release(); // initial attempt
+
+#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
+                    Task.Run(async () =>
+                    {
+                        while (!stop)
+                        {
+                            await retrySignal.WaitAsync();
+
+                            lock (retryLock)
                             {
                                 retryRequested = false;
-                                continue;
                             }
+
+                            attemptCount++;
+                            if (attemptCount > 3)
+                            {
+                                logger.Error("Maximum auto-patch retry attempts exceeded.");
+                                break;
+                            }
+
+                            try
+                            {
+                                var success = await patchController.RunAsync(path, new Progress<string>(m => window.SetStatus(m)), window);
+                                if (success || stop)
+                                    break;
+                            }
+                            catch (Exception ex)
+                            {
+                                logger.Error($"Patch attempt failed: {ex}");
+                            }
+
+                            if (stop)
+                                break;
+
+                            lock (retryLock)
+                            {
+                                if (retryRequested)
+                                {
+                                    retryRequested = false;
+                                    continue;
+                                }
+                            }
+
+                            // No retry requested during the attempt; wait for the next retry signal.
                         }
 
-                        // No retry requested during the attempt; wait for the next retry signal.
-                    }
-
-                    doneTcs.TrySetResult(null);
-                });
+                        doneTcs.TrySetResult(null);
+                    });
 #pragma warning restore CS4014
 
-                window.ShowDialog();
-                await doneTcs.Task;
+                    window.ShowDialog();
+                    await doneTcs.Task;
+                }
             }
         }
 
@@ -167,18 +173,30 @@ namespace WandEnhancer.AutoPatch
             using (var notification = new NotificationService())
             using (var window = new ProgressWindow())
             {
+                // Ensure the window handle is created before the background task
+                // tries to Invoke status updates onto the UI thread.
+                var dummyHandle = window.Handle;
+
                 var patchController = new PatchModeController(settingsStore, locator, processManager, patcher, logger, notification);
                 var launchController = new LaunchModeController(patchController, logger);
 
                 window.RetryRequested += (s, e) =>
                 {
                     window.SetStatus("Retrying patch...");
+                    window.HideFailureButtons();
                     _ = Task.Run(async () => await launchController.RunAsync(path, wandArgs, window));
                 };
 
                 window.OpenMainRequested += (s, e) =>
                 {
-                    OpenMainApplication();
+                    try
+                    {
+                        OpenMainApplication();
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Error($"Open main application failed: {ex}");
+                    }
                     window.SafeClose();
                 };
 
@@ -190,6 +208,15 @@ namespace WandEnhancer.AutoPatch
 
         private static void RunWatchMode(ISettingsStore settingsStore, IWeModLocator locator, IProcessManager processManager, IPatcher patcher, ILogger logger, string path)
         {
+            bool createdNew;
+            using (var mutex = new Mutex(true, @"Global\WandEnhancerAutoPatchWatcher", out createdNew))
+            {
+                if (!createdNew)
+                {
+                    logger.Info("Another watcher instance is already running. Exiting.");
+                    return;
+                }
+
             using (var cts = new CancellationTokenSource())
             using (var notification = new NotificationService())
             {
@@ -227,6 +254,7 @@ namespace WandEnhancer.AutoPatch
 
                 try { watchTask?.Wait(TimeSpan.FromSeconds(5)); } catch { }
             }
+            } // mutex
         }
 
         private static void OpenMainApplication()

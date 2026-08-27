@@ -57,5 +57,36 @@ namespace WandEnhancer.Services
             dynamic rootFolder = taskService.GetFolder("\\");
             rootFolder.DeleteTask(TaskName, 0);
         }
+
+        public bool Exists()
+        {
+            try
+            {
+                var taskServiceType = Type.GetTypeFromProgID("Schedule.Service");
+                dynamic taskService = Activator.CreateInstance(taskServiceType);
+                taskService.Connect();
+
+                dynamic rootFolder = taskService.GetFolder("\\");
+                dynamic task = rootFolder.GetTask(TaskName);
+                return task != null;
+            }
+            catch (FileNotFoundException)
+            {
+                return false;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return false;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return false;
+            }
+            catch
+            {
+                // COM may throw for a missing task depending on the Windows version.
+                return false;
+            }
+        }
     }
 }

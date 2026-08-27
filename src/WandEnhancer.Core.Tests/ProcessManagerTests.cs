@@ -2,18 +2,16 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
+using NUnit.Framework;
 using WandEnhancer.Core.Services;
 
 namespace WandEnhancer.Core.Tests
 {
-    internal static class ProcessManagerTests
+    [TestFixture]
+    public class ProcessManagerTests
     {
-        public static void RunAll()
-        {
-            TerminateAllWandProcessesAsync_KillsDummyWandProcess().GetAwaiter().GetResult();
-        }
-
-        private static async Task TerminateAllWandProcessesAsync_KillsDummyWandProcess()
+        [Test]
+        public async Task TerminateAllWandProcessesAsync_KillsDummyWandProcess()
         {
             var logger = new MemoryLogger();
             var manager = new ProcessManager(logger);
@@ -29,13 +27,11 @@ namespace WandEnhancer.Core.Tests
                 UseShellExecute = false
             });
 
-            if (process.HasExited)
-                throw new Exception("Dummy Wand process exited immediately.");
+            Assert.IsFalse(process.HasExited, "Dummy Wand process exited immediately");
 
             await manager.TerminateAllWandProcessesAsync(TimeSpan.FromSeconds(5));
 
-            if (!process.HasExited)
-                throw new Exception("Dummy Wand process was not terminated.");
+            Assert.IsTrue(process.HasExited, "Dummy Wand process was not terminated");
 
             process.Dispose();
             try { File.Delete(dummyExe); } catch { }

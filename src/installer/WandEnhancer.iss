@@ -43,6 +43,8 @@ Name: "autopatch"; Description: "Keep Wand patched automatically after updates";
 Source: "{#OutputDir}\WandEnhancer.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#OutputDir}\AutoPatch\WandEnhancer.AutoPatch.exe"; DestDir: "{app}\AutoPatch"; Flags: ignoreversion
 Source: "{#OutputDir}\AutoPatch\WandEnhancer.Core.dll"; DestDir: "{app}\AutoPatch"; Flags: ignoreversion
+Source: "{#OutputDir}\AutoPatch\Newtonsoft.Json.dll"; DestDir: "{app}\AutoPatch"; Flags: ignoreversion
+Source: "{#OutputDir}\AutoPatch\AsarSharp.dll"; DestDir: "{app}\AutoPatch"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
@@ -78,13 +80,30 @@ begin
     SetLength(Result, Length(Result) - 1);
 end;
 
+// Returns the name of the WeMod/Wand executable present in the folder, or ''
+// if neither Wand.exe nor WeMod.exe exists.
+function GetWandExecutableName(const Path: string): string;
+begin
+  Result := '';
+  if Path = '' then Exit;
+  if FileExists(Path + '\Wand.exe') then
+    Result := 'Wand.exe'
+  else if FileExists(Path + '\WeMod.exe') then
+    Result := 'WeMod.exe';
+end;
+
 function LooksLikeWandPath(Path: string): Boolean;
+var
+  ExeName: string;
 begin
   // Keep this in sync with WandEnhancer.Core.Extensions.PathExtensions.CheckWeModPath.
   // WeMod stores app.asar inside the resources directory.
   Result := (Path <> '') and
-            DirExists(Path) and
-            FileExists(Path + '\Wand.exe') and
+            DirExists(Path);
+  if not Result then Exit;
+
+  ExeName := GetWandExecutableName(Path);
+  Result := (ExeName <> '') and
             DirExists(Path + '\resources') and
             FileExists(Path + '\resources\app.asar');
 end;
@@ -195,7 +214,7 @@ begin
 
   // Case 2: an app-* subfolder was selected directly.
   if (Pos('\app-', NormalizedPath) > 0) and
-     FileExists(NormalizedPath + '\Wand.exe') then
+     (GetWandExecutableName(NormalizedPath) <> '') then
   begin
     Result := NormalizedPath;
     Exit;
@@ -231,15 +250,15 @@ begin
     Exit;
   end;
 
-  // WeMod root with a Wand.exe launcher stub (we will resolve app-* later).
-  if FileExists(NormalizedPath + '\Wand.exe') then
+  // WeMod root with a Wand.exe or WeMod.exe launcher stub (we will resolve app-* later).
+  if GetWandExecutableName(NormalizedPath) <> '' then
   begin
     Result := True;
     Exit;
   end;
 
   // Specific app-* subfolder selected directly.
-  if (Pos('\app-', NormalizedPath) > 0) and FileExists(NormalizedPath + '\Wand.exe') then
+  if (Pos('\app-', NormalizedPath) > 0) and (GetWandExecutableName(NormalizedPath) <> '') then
   begin
     Result := True;
     Exit;
@@ -289,12 +308,14 @@ begin
   if Result <> '' then Exit;
 
   // Fallback to well-known locations.
-  SetArrayLength(Candidates, 5);
+  SetArrayLength(Candidates, 7);
   Candidates[0] := ExpandConstant('{localappdata}') + '\Programs\Wand';
   Candidates[1] := ExpandConstant('{localappdata}') + '\Wand';
   Candidates[2] := ExpandConstant('{localappdata}') + '\WeMod';
   Candidates[3] := ExpandConstant('{pf}') + '\Wand';
   Candidates[4] := ExpandConstant('{pf32}') + '\Wand';
+  Candidates[5] := ExpandConstant('{pf}') + '\WeMod';
+  Candidates[6] := ExpandConstant('{pf32}') + '\WeMod';
 
   for I := 0 to GetArrayLength(Candidates) - 1 do
   begin
@@ -362,7 +383,7 @@ begin
 
   if not IsWandRootFolder(Path) then
   begin
-    MsgBox('The selected Wand folder is missing Wand.exe or a valid app-* payload subfolder. Auto-patch will not be enabled.', mbError, MB_OK);
+    MsgBox('The selected Wand folder is missing Wand.exe/WeMod.exe or a valid app-* payload subfolder. Auto-patch will not be enabled.', mbError, MB_OK);
     Result := False;
   end;
 end;
@@ -375,7 +396,7 @@ begin
   begin
     if not IsWandRootFolder(WandPathPage.Values[0]) then
     begin
-      MsgBox('Please select the WeMod/Wand folder that contains Wand.exe.' + #13#10 +
+      MsgBox('Please select the WeMod/Wand folder that contains Wand.exe or WeMod.exe.' + #13#10 +
              'If the actual files are in a versioned subfolder (e.g. app-12.43.1), select the parent WeMod folder and the installer will pick the latest version.', mbError, MB_OK);
       Result := False;
     end;

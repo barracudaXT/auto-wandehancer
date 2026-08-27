@@ -53,6 +53,7 @@ namespace WandEnhancer.View.MainWindow
         private void OpenAutoPatchSetupClicked(object sender, RoutedEventArgs e)
         {
             var title = Application.Current.FindResource("autopatch_title") as string;
+            PopupHost.Closed = () => ViewModel.RefreshAutoPatchStatus();
             OpenPopup(new AutoPatchSetupView(), title);
         }
     }

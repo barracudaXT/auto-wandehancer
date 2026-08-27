@@ -48,6 +48,23 @@
                 </StackPanel>
                                 
                 <StackPanel  HorizontalAlignment="Right" Orientation="Horizontal">
+                    <Viewbox Width="18" Height="18" Margin="0 0 8 0" VerticalAlignment="Center">
+                        <Path Stretch="Fill">
+                            <Path.Style>
+                                <Style TargetType="Path">
+                                    <Setter Property="Fill" Value="{DynamicResource Destructive}"/>
+                                    <Setter Property="Data" Value="{StaticResource AlertDecagram}"/>
+                                    <Setter Property="ToolTip" Value="{Binding AutoPatchStatusDescription}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsAutoPatchEnabled}" Value="True">
+                                            <Setter Property="Fill" Value="{DynamicResource Success}"/>
+                                            <Setter Property="Data" Value="{StaticResource CheckDecagram}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Path.Style>
+                        </Path>
+                    </Viewbox>
                     <Button
                         Margin="0 0 5 0"
                         Width="25" Height="25" Padding="5.5"

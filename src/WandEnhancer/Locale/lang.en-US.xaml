@@ -43,6 +43,8 @@
     <s:String x:Key="autopatch_pick">Pick</s:String>
     <s:String x:Key="autopatch_enable">Enable</s:String>
     <s:String x:Key="autopatch_disable">Disable</s:String>
+    <s:String x:Key="autopatch_status_enabled">Auto-patch is enabled</s:String>
+    <s:String x:Key="autopatch_status_disabled">Auto-patch is disabled</s:String>
     <!--#endregion -->
 
 </ResourceDictionary>

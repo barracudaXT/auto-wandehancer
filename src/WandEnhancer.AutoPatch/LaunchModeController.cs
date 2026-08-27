@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using WandEnhancer.Core.Models;
 using WandEnhancer.Core.Services;
 
 namespace WandEnhancer.AutoPatch
@@ -24,6 +25,9 @@ namespace WandEnhancer.AutoPatch
             if (!success)
             {
                 _logger.Error("Launch aborted because patch failed.");
+                // Even though patching failed, the window is already showing failure
+                // controls. The caller / event handlers are responsible for launching
+                // or retrying; do not close the window here.
                 return;
             }
 
@@ -36,13 +40,29 @@ namespace WandEnhancer.AutoPatch
                 return;
             }
 
+            var launchPath = ResolveLaunchPath(info);
+            var workingDirectory = info.RootPath ?? info.BasePath;
+            LaunchWand(launchPath, workingDirectory, wandArgs, window);
+        }
+
+        private static string ResolveLaunchPath(WeModInfo info)
+        {
             // Launch the root stub when available (WeMod uses a launcher in the
             // parent folder that delegates to the latest app-* payload folder).
-            var launchPath = File.Exists(Path.Combine(info.RootPath ?? info.BasePath, "Wand.exe"))
-                ? Path.Combine(info.RootPath ?? info.BasePath, "Wand.exe")
-                : info.ExecutablePath;
-            var workingDirectory = info.RootPath ?? info.BasePath;
+            var rootPath = info.RootPath ?? info.BasePath;
+            var rootStubNames = new[] { "WeMod.exe", "Wand.exe" };
+            foreach (var name in rootStubNames)
+            {
+                var stubPath = Path.Combine(rootPath, name);
+                if (File.Exists(stubPath))
+                    return stubPath;
+            }
 
+            return info.ExecutablePath;
+        }
+
+        private static void LaunchWand(string launchPath, string workingDirectory, string[] wandArgs, ProgressWindow window)
+        {
             var startInfo = new ProcessStartInfo(launchPath)
             {
                 UseShellExecute = true,
@@ -59,7 +79,6 @@ namespace WandEnhancer.AutoPatch
             }
             catch (Exception ex)
             {
-                _logger.Error($"Failed to start Wand: {ex}");
                 window?.ShowFailure($"Failed to start Wand: {ex.Message}");
                 return;
             }

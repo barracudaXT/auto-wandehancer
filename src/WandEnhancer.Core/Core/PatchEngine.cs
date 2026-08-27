@@ -20,7 +20,7 @@ namespace WandEnhancer.Core
             public Dictionary<string, string> PatchedFiles; // fileName -> patched content
         }
 
-        public static PatchResult ApplyPatches(string directory, HashSet<EPatchType> patchTypes, Action<string, ELogType> logger = null)
+        public static PatchResult ApplyPatches(string directory, HashSet<EPatchType> patchTypes, Action<string, ELogType> logger = null, bool writeResults = false)
         {
             if (logger == null) logger = (msg, type) => { };
 
@@ -59,6 +59,8 @@ namespace WandEnhancer.Core
 
                 if (fileChanged)
                 {
+                    if (writeResults)
+                        File.WriteAllText(item, data);
                     patchedFiles[Path.GetFileName(item)] = data;
                 }
             }
@@ -70,8 +72,6 @@ namespace WandEnhancer.Core
                 PatchedFiles = patchedFiles
             };
         }
-
-        // --- These are exact copies of Enhancer.cs's private methods, made public for testability ---
 
         public static bool IsCandidateBundleFile(string filePath)
         {

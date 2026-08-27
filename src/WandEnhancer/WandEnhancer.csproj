@@ -9,32 +9,26 @@
         <OutputType>WinExe</OutputType>
         <RootNamespace>WandEnhancer</RootNamespace>
         <AssemblyName>WandEnhancer</AssemblyName>
-        <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
         <FileAlignment>512</FileAlignment>
         <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
-        <WarningLevel>4</WarningLevel>
         <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
         <ApplicationIcon>..\assets\appicon.ico</ApplicationIcon>
     </PropertyGroup>
     <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-        <PlatformTarget>x64</PlatformTarget>
         <DebugSymbols>true</DebugSymbols>
         <DebugType>full</DebugType>
         <Optimize>false</Optimize>
         <OutputPath>bin\Debug\</OutputPath>
         <DefineConstants>DEBUG;TRACE</DefineConstants>
         <ErrorReport>prompt</ErrorReport>
-        <WarningLevel>4</WarningLevel>
         <Prefer32bit>false</Prefer32bit>
     </PropertyGroup>
     <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-        <PlatformTarget>x64</PlatformTarget>
         <DebugType>none</DebugType>
         <Optimize>true</Optimize>
         <OutputPath>bin\Release\</OutputPath>
         <DefineConstants>TRACE</DefineConstants>
         <ErrorReport>prompt</ErrorReport>
-        <WarningLevel>4</WarningLevel>
         <Prefer32bit>false</Prefer32bit>
     </PropertyGroup>
     <PropertyGroup>
@@ -187,7 +181,8 @@
 
     <Target Name="CopyAutoPatchOutput" AfterTargets="Build">
         <ItemGroup>
-            <AutoPatchOutput Include="..\WandEnhancer.AutoPatch\bin\$(Configuration)\*.*" />
+            <AutoPatchOutput Include="..\WandEnhancer.AutoPatch\bin\$(Configuration)\*.exe;
+                                     ..\WandEnhancer.AutoPatch\bin\$(Configuration)\*.dll" />
         </ItemGroup>
         <MakeDir Directories="$(OutputPath)AutoPatch\" />
         <Copy SourceFiles="@(AutoPatchOutput)" DestinationFolder="$(OutputPath)AutoPatch\" SkipUnchangedFiles="true" />

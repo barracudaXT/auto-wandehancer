@@ -112,6 +112,19 @@ namespace WandEnhancer.AutoPatch
             _openMainButton.Visible = true;
         }
 
+        public void HideFailureButtons()
+        {
+            if (IsDisposed || !IsHandleCreated)
+                return;
+            if (InvokeRequired)
+            {
+                Invoke(new Action(HideFailureButtons));
+                return;
+            }
+            _retryButton.Visible = false;
+            _openMainButton.Visible = false;
+        }
+
         public void SafeClose()
         {
             if (IsDisposed || !IsHandleCreated)

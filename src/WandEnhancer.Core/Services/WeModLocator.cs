@@ -70,8 +70,9 @@ namespace WandEnhancer.Core.Services
             if (string.IsNullOrWhiteSpace(resolvedPath)) return null;
 
             if (!_pathValidator(resolvedPath)) return null;
-            var exePath = Path.Combine(resolvedPath, "Wand.exe");
-            if (!File.Exists(exePath)) return null;
+            var exeName = PathExtensions.GetWeModExecutableName(resolvedPath);
+            if (exeName == null) return null;
+            var exePath = Path.Combine(resolvedPath, exeName);
 
             return new WeModInfo
             {
