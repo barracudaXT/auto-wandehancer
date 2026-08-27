@@ -218,16 +218,15 @@ namespace WandEnhancer.AutoPatch
                 }
 
             using (var cts = new CancellationTokenSource())
-            using (var notification = new NotificationService())
             {
-                var patchController = new PatchModeController(settingsStore, locator, processManager, patcher, logger, notification);
-                var updateChecker = new UpdateChecker(logger);
-                var updateInstaller = new UpdateInstaller(logger, notification);
-                UpdateInfo pendingUpdate = null;
                 var tray = new TrayAgent();
+                var patchController = new PatchModeController(settingsStore, locator, processManager, patcher, logger, tray);
+                var updateChecker = new UpdateChecker(logger);
+                var updateInstaller = new UpdateInstaller(logger, tray);
+                UpdateInfo pendingUpdate = null;
                 Task watchTask = null;
 
-                using (var watchController = new WatchModeController(patchController, logger, notification))
+                using (var watchController = new WatchModeController(patchController, logger, tray))
                 {
                     tray.PatchNowClicked += (s, e) =>
                     {
@@ -267,7 +266,7 @@ namespace WandEnhancer.AutoPatch
                                 {
                                     pendingUpdate = null;
                                     tray.ShowUpToDate();
-                                    notification.ShowInfo("WandEnhancer", "You are running the latest version.");
+                                    tray.ShowInfo("WandEnhancer", "You are running the latest version.");
                                 }
                             }
                             catch (Exception ex)

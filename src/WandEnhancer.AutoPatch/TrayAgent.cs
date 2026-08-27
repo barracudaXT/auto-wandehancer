@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
+using WandEnhancer.Core.Services;
 
 namespace WandEnhancer.AutoPatch
 {
-    public class TrayAgent : ApplicationContext
+    public class TrayAgent : ApplicationContext, INotificationService
     {
         private readonly NotifyIcon _icon;
         private readonly ToolStripMenuItem _enabledMenuItem;
@@ -76,6 +77,20 @@ namespace WandEnhancer.AutoPatch
             }
             _updatePending = false;
             _updateMenuItem.Text = "Check for updates";
+        }
+
+        public void ShowInfo(string title, string message) => ShowBalloon(title, message, ToolTipIcon.Info);
+        public void ShowWarning(string title, string message) => ShowBalloon(title, message, ToolTipIcon.Warning);
+        public void ShowError(string title, string message) => ShowBalloon(title, message, ToolTipIcon.Error);
+
+        private void ShowBalloon(string title, string message, ToolTipIcon tipIcon)
+        {
+            if (_icon.ContextMenuStrip.InvokeRequired)
+            {
+                _icon.ContextMenuStrip.BeginInvoke(new Action(() => ShowBalloon(title, message, tipIcon)));
+                return;
+            }
+            _icon.ShowBalloonTip(3000, title, message, tipIcon);
         }
 
         private static Icon LoadEmbeddedIcon()
