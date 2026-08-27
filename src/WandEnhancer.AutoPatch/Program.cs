@@ -45,7 +45,7 @@ namespace WandEnhancer.AutoPatch
                     RunLaunchMode(settingsStore, locator, processManager, patcher, logger, arguments.WeModPath, GetWandArgs(args)).GetAwaiter().GetResult();
                     break;
                 case "watch":
-                    new WatchModeOrchestrator(settingsStore, locator, processManager, patcher, logger, OpenMainApplication)
+                    new WatchModeOrchestrator(settingsStore, locator, processManager, patcher, logger, () => OpenMainApplication(logger))
                         .Run(arguments.WeModPath);
                     break;
             }
@@ -90,7 +90,7 @@ namespace WandEnhancer.AutoPatch
 
                         try
                         {
-                            OpenMainApplication();
+                            OpenMainApplication(logger);
                         }
                         catch (Exception ex)
                         {
@@ -192,7 +192,7 @@ namespace WandEnhancer.AutoPatch
                 {
                     try
                     {
-                        OpenMainApplication();
+                        OpenMainApplication(logger);
                     }
                     catch (Exception ex)
                     {
@@ -207,30 +207,40 @@ namespace WandEnhancer.AutoPatch
             }
         }
 
-        private static void OpenMainApplication()
+        private static void OpenMainApplication(ILogger logger)
         {
             var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            var parentDir = Directory.GetParent(baseDir)?.FullName;
             var candidates = new[]
             {
                 Path.Combine(baseDir, "WandEnhancer.exe"),
-                Path.Combine(Directory.GetParent(baseDir).FullName, "WandEnhancer.exe")
+                parentDir != null ? Path.Combine(parentDir, "WandEnhancer.exe") : null,
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                             "WandEnhancer", "WandEnhancer.exe"),
             };
 
             foreach (var exePath in candidates)
             {
-                if (File.Exists(exePath))
+                if (exePath != null && File.Exists(exePath))
                 {
                     try
                     {
                         Process.Start(exePath);
                     }
-                    catch (Exception)
+                    catch (Exception ex)
                     {
-                        // Best effort.
+                        logger.Error($"Failed to start WandEnhancer.exe: {ex.Message}");
                     }
                     return;
                 }
             }
+
+            logger.Error($"WandEnhancer.exe not found. Searched: {string.Join(", ", candidates)}");
+            MessageBox.Show(
+                "Could not find WandEnhancer.exe. Please reinstall WandEnhancer.",
+                "WandEnhancer",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
         }
 
         private static string[] GetWandArgs(string[] args)

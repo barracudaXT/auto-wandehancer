@@ -53,6 +53,8 @@ jobs:
       - name: Sync upstream source
         if: needs.check-upstream.outputs.new_version == 'true'
         run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
           git remote add upstream https://github.com/k1tbyte/Wand-Enhancer.git
           git fetch upstream
           git merge upstream/master --no-edit --allow-unrelated-histories

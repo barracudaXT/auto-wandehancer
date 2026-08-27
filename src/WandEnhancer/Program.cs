@@ -127,6 +127,29 @@ namespace WandEnhancer
                 if (string.Equals(args[0], "--disable-autopatch", StringComparison.OrdinalIgnoreCase))
                 {
                     WriteSetupLog(setupLogPath, "--disable-autopatch invoked.");
+
+                    try
+                    {
+                        foreach (var proc in System.Diagnostics.Process.GetProcessesByName("WandEnhancer.AutoPatch"))
+                        {
+                            try
+                            {
+                                if (!proc.CloseMainWindow() || !proc.WaitForExit(3000))
+                                {
+                                    proc.Kill();
+                                    proc.WaitForExit(2000);
+                                }
+                            }
+                            catch { }
+                            proc.Dispose();
+                        }
+                        WriteSetupLog(setupLogPath, "Stopped watcher process(es).");
+                    }
+                    catch (Exception killEx)
+                    {
+                        WriteSetupLog(setupLogPath, $"Failed to stop watcher: {killEx.Message}");
+                    }
+
                     new ShortcutRegistrar().Unregister();
                     new ScheduledTaskRegistrar().Delete();
                     MessageBox.Show("Auto-patch disabled successfully.", "WandEnhancer");

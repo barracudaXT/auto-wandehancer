@@ -83,6 +83,7 @@ namespace WandEnhancer.AutoPatch
 
                     tray.CheckForUpdatesClicked += (s, e) =>
                     {
+                        _logger.Info("Manual update check requested.");
                         tray.ShowCheckingForUpdates();
                         Task.Run(async () =>
                         {
@@ -91,27 +92,33 @@ namespace WandEnhancer.AutoPatch
                                 var info = await updateChecker.CheckForUpdateAsync();
                                 if (info == null)
                                 {
+                                    _logger.Error("Manual update check: could not reach update server.");
                                     tray.ShowUpdateCheckFailed();
-                                    tray.ShowError("WandEnhancer", "Could not check for updates. Try again later.");
+                                    MessageBox.Show("Could not check for updates. Try again later.",
+                                        "WandEnhancer", MessageBoxButtons.OK, MessageBoxIcon.Error);
                                     return;
                                 }
                                 if (updateChecker.IsUpdateAvailable(info))
                                 {
+                                    _logger.Info($"Manual update check: update available ({info.TagName}).");
                                     pendingUpdate = info;
                                     tray.ShowUpdateAvailable(info.TagName);
                                 }
                                 else
                                 {
+                                    _logger.Info("Manual update check: up to date.");
                                     pendingUpdate = null;
                                     tray.ShowUpToDate();
-                                    tray.ShowInfo("WandEnhancer", "You are running the latest version.");
+                                    MessageBox.Show("You are running the latest version.",
+                                        "WandEnhancer", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                 }
                             }
                             catch (Exception ex)
                             {
                                 _logger.Error($"Manual update check failed: {ex}");
                                 tray.ShowUpdateCheckFailed();
-                                tray.ShowError("WandEnhancer", "Could not check for updates. Try again later.");
+                                MessageBox.Show("Could not check for updates. Try again later.",
+                                    "WandEnhancer", MessageBoxButtons.OK, MessageBoxIcon.Error);
                             }
                         });
                     };
