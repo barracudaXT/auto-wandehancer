@@ -1,0 +1,132 @@
+name: Build and Release
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check-upstream:
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.check.outputs.new_version }}
+      upstream_tag: ${{ steps.check.outputs.upstream_tag }}
+    steps:
+      - name: Check upstream for new releases
+        id: check
+        run: |
+          UPSTREAM_TAG=$(curl -s https://api.github.com/repos/k1tbyte/Wand-Enhancer/releases/latest \
+            | jq -r '.tag_name // empty')
+          if [ -z "$UPSTREAM_TAG" ]; then
+            echo "No upstream release found."
+            echo "new_version=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          OUR_TAG=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest \
+            | jq -r '.tag_name // empty')
+
+          echo "Upstream: $UPSTREAM_TAG, Ours: $OUR_TAG"
+
+          if [ "$UPSTREAM_TAG" = "$OUR_TAG" ]; then
+            echo "Already up to date."
+            echo "new_version=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "New upstream version detected: $UPSTREAM_TAG"
+            echo "new_version=true" >> "$GITHUB_OUTPUT"
+            echo "upstream_tag=$UPSTREAM_TAG" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: check-upstream
+    if: needs.check-upstream.outputs.new_version == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync upstream source
+        if: needs.check-upstream.outputs.new_version == 'true'
+        run: |
+          git remote add upstream https://github.com/k1tbyte/Wand-Enhancer.git
+          git fetch upstream
+          git merge upstream/master --no-edit --allow-unrelated-histories
+        shell: bash
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup NuGet
+        uses: nuget/setup-nuget@v2
+
+      - name: Setup CMake
+        uses: lukka/get-cmake@latest
+
+      - name: Build native proxy DLL
+        working-directory: src/tools/asar-fuses-bypass
+        run: |
+          cmake -B build -A x64
+          cmake --build build --config Release
+
+      - name: Build web panel
+        working-directory: src/web-panel
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Restore NuGet packages
+        working-directory: src
+        run: nuget restore Wand-Enhancer.sln
+
+      - name: Build solution
+        working-directory: src
+        run: msbuild Wand-Enhancer.sln /p:Configuration=Release /p:Platform="Any CPU" /v:minimal
+
+      - name: Determine version
+        id: version
+        run: |
+          $tag = "${{ needs.check-upstream.outputs.upstream_tag }}"
+          if ([string]::IsNullOrEmpty($tag)) {
+            $dll = "src\WandEnhancer\bin\Release\WandEnhancer.exe"
+            $ver = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($dll).FileVersion
+            $tag = "v$ver"
+          }
+          echo "tag=$tag" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
+      - name: Build installer
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+            $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          }
+          & $iscc src\installer\WandEnhancer.iss /DOutputDir=src\WandEnhancer\bin\Release
+        shell: pwsh
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: WandEnhancer ${{ steps.version.outputs.tag }}
+          body: |
+            Automated build from upstream release ${{ steps.version.outputs.tag }}.
+
+            ### Changes
+            See [upstream release notes](https://github.com/k1tbyte/Wand-Enhancer/releases/tag/${{ steps.version.outputs.tag }}).
+          files: dist/WandEnhancerSetup.exe
+          draft: false
+          prerelease: false

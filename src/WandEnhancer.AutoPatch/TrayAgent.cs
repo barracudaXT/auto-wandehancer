@@ -8,17 +8,22 @@ namespace WandEnhancer.AutoPatch
     {
         private readonly NotifyIcon _icon;
         private readonly ToolStripMenuItem _enabledMenuItem;
+        private readonly ToolStripMenuItem _updateMenuItem;
 
         public event EventHandler PatchNowClicked;
         public event EventHandler OpenSettingsClicked;
         public event EventHandler ExitClicked;
         public event EventHandler WatcherEnabledChanged;
+        public event EventHandler CheckForUpdatesClicked;
+        public event EventHandler InstallUpdateClicked;
 
         public bool WatcherEnabled
         {
             get => _enabledMenuItem.Checked;
             set => _enabledMenuItem.Checked = value;
         }
+
+        private bool _updatePending;
 
         public TrayAgent()
         {
@@ -33,11 +38,44 @@ namespace WandEnhancer.AutoPatch
             _enabledMenuItem = new ToolStripMenuItem("Watcher enabled", null, OnToggleEnabled) { Checked = true };
             menu.Items.Add(_enabledMenuItem);
             menu.Items.Add("Patch now", null, (s, e) => PatchNowClicked?.Invoke(this, e));
+            _updateMenuItem = new ToolStripMenuItem("Check for updates", null, OnUpdateMenuClicked);
+            menu.Items.Add(_updateMenuItem);
             menu.Items.Add("Open WandEnhancer", null, (s, e) => OpenSettingsClicked?.Invoke(this, e));
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Exit", null, (s, e) => ExitClicked?.Invoke(this, e));
 
             _icon.ContextMenuStrip = menu;
+        }
+
+        private void OnUpdateMenuClicked(object sender, EventArgs e)
+        {
+            if (_updatePending)
+                InstallUpdateClicked?.Invoke(this, e);
+            else
+                CheckForUpdatesClicked?.Invoke(this, e);
+        }
+
+        public void ShowUpdateAvailable(string version)
+        {
+            if (_icon.ContextMenuStrip.InvokeRequired)
+            {
+                _icon.ContextMenuStrip.BeginInvoke(new Action(() => ShowUpdateAvailable(version)));
+                return;
+            }
+            _updatePending = true;
+            _updateMenuItem.Text = $"Update available: {version}";
+            _icon.ShowBalloonTip(5000, "WandEnhancer", $"Version {version} is available. Right-click the tray icon to update.", ToolTipIcon.Info);
+        }
+
+        public void ShowUpToDate()
+        {
+            if (_icon.ContextMenuStrip.InvokeRequired)
+            {
+                _icon.ContextMenuStrip.BeginInvoke(new Action(ShowUpToDate));
+                return;
+            }
+            _updatePending = false;
+            _updateMenuItem.Text = "Check for updates";
         }
 
         private static Icon LoadEmbeddedIcon()

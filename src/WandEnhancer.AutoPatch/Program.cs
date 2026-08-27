@@ -221,6 +221,9 @@ namespace WandEnhancer.AutoPatch
             using (var notification = new NotificationService())
             {
                 var patchController = new PatchModeController(settingsStore, locator, processManager, patcher, logger, notification);
+                var updateChecker = new UpdateChecker(logger);
+                var updateInstaller = new UpdateInstaller(logger, notification);
+                UpdateInfo pendingUpdate = null;
                 var tray = new TrayAgent();
                 Task watchTask = null;
 
@@ -248,6 +251,49 @@ namespace WandEnhancer.AutoPatch
                     };
                     tray.WatcherEnabledChanged += (s, e) => watchController.Enabled = tray.WatcherEnabled;
 
+                    tray.CheckForUpdatesClicked += (s, e) =>
+                    {
+                        Task.Run(async () =>
+                        {
+                            try
+                            {
+                                var info = await updateChecker.CheckForUpdateAsync();
+                                if (updateChecker.IsUpdateAvailable(info))
+                                {
+                                    pendingUpdate = info;
+                                    tray.ShowUpdateAvailable(info.TagName);
+                                }
+                                else
+                                {
+                                    pendingUpdate = null;
+                                    tray.ShowUpToDate();
+                                    notification.ShowInfo("WandEnhancer", "You are running the latest version.");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                logger.Error($"Manual update check failed: {ex}");
+                            }
+                        });
+                    };
+
+                    tray.InstallUpdateClicked += (s, e) =>
+                    {
+                        var update = pendingUpdate;
+                        if (update == null) return;
+                        Task.Run(async () =>
+                        {
+                            var installed = await updateInstaller.DownloadAndInstallAsync(update, cts.Token);
+                            if (installed)
+                            {
+                                cts.Cancel();
+                                Application.Exit();
+                            }
+                        });
+                    };
+
+                    StartPeriodicUpdateCheck(updateChecker, tray, logger, cts.Token, u => pendingUpdate = u);
+
                     watchTask = watchController.RunAsync(path, cts.Token);
                     Application.Run(tray);
                 }
@@ -255,6 +301,45 @@ namespace WandEnhancer.AutoPatch
                 try { watchTask?.Wait(TimeSpan.FromSeconds(5)); } catch { }
             }
             } // mutex
+        }
+
+        private static void StartPeriodicUpdateCheck(
+            UpdateChecker checker,
+            TrayAgent tray,
+            ILogger logger,
+            CancellationToken token,
+            Action<UpdateInfo> setPending)
+        {
+            Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(30), token);
+
+                    while (!token.IsCancellationRequested)
+                    {
+                        try
+                        {
+                            var info = await checker.CheckForUpdateAsync();
+                            if (checker.IsUpdateAvailable(info))
+                            {
+                                setPending(info);
+                                tray.ShowUpdateAvailable(info.TagName);
+                                logger.Info($"Update available: {info.TagName}");
+                            }
+                        }
+                        catch (Exception ex) when (!(ex is OperationCanceledException))
+                        {
+                            logger.Error($"Periodic update check failed: {ex}");
+                        }
+
+                        await Task.Delay(TimeSpan.FromHours(6), token);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                }
+            }, token);
         }
 
         private static void OpenMainApplication()

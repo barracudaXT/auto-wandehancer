@@ -5,7 +5,7 @@
 #define MyAppName "WandEnhancer"
 #define MyAppVersion "1.0.0"
 #define MyAppPublisher "WandEnhancer Contributors"
-#define MyAppURL "https://github.com/k1tbyte/Wand-Enhancer"
+#define MyAppURL "https://github.com/barracudaXT/auto-wandehancer"
 #define MyAppExeName "WandEnhancer.exe"
 
 #ifndef OutputDir

@@ -75,6 +75,7 @@
     <Compile Include="Services\WeModLocator.cs" />
     <Compile Include="Services\ShortcutRegistrar.cs" />
     <Compile Include="Services\IShortcutRegistrar.cs" />
+    <Compile Include="Services\UpdateChecker.cs" />
     <Compile Include="Utils\Win32\Shortcut.cs" />
   </ItemGroup>
   <ItemGroup>
