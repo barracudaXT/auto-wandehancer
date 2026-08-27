@@ -86,6 +86,24 @@ function Resolve-InnoSetupPath {
     throw 'Inno Setup compiler (ISCC.exe) not found.'
 }
 
+function Resolve-NuGetPath {
+    $command = Get-Command 'nuget' -ErrorAction SilentlyContinue
+    if ($command) {
+        return $command.Source
+    }
+
+    $localPath = Join-Path $repoRoot '.tmp\nuget.exe'
+    if (Test-Path $localPath) {
+        return $localPath
+    }
+
+    Write-Host '    Downloading nuget.exe...' -ForegroundColor Yellow
+    New-Item -ItemType Directory -Force -Path (Split-Path $localPath) | Out-Null
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Invoke-WebRequest -Uri 'https://dist.nuget.org/win-x86-commandline/latest/nuget.exe' -OutFile $localPath
+    return $localPath
+}
+
 function Invoke-Step {
     param(
         [string]$Label,
@@ -105,6 +123,7 @@ $visualStudio = Resolve-VisualStudioPath
 $msbuild = Resolve-MSBuildPath $visualStudio
 $dumpBin = Resolve-DumpBinPath $visualStudio
 $iscc = Resolve-InnoSetupPath
+$nuget = Resolve-NuGetPath
 
 Invoke-Step 'Install web-panel dependencies' {
     & $pnpm --dir $webPanelDir install --frozen-lockfile
@@ -132,7 +151,7 @@ Invoke-Step 'Verify native runtime dependencies' {
 }
 
 Invoke-Step 'Restore NuGet packages' {
-    & $msbuild $solutionPath /m /t:Restore /p:RestorePackagesConfig=true
+    & $nuget restore $solutionPath
 }
 
 Invoke-Step 'Build solution' {
