@@ -57,7 +57,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git remote add upstream https://github.com/k1tbyte/Wand-Enhancer.git
           git fetch upstream
-          git merge upstream/master --no-edit --allow-unrelated-histories
+          git merge upstream/master -X ours --no-edit --allow-unrelated-histories || echo "Merge had conflicts; building with current source."
         shell: bash
 
       - name: Setup Node.js
