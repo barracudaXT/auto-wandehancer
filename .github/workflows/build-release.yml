@@ -116,7 +116,7 @@ jobs:
             choco install innosetup -y --no-progress
             $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           }
-          & $iscc src\installer\WandEnhancer.iss /DOutputDir=src\WandEnhancer\bin\Release
+          & $iscc src\installer\WandEnhancer.iss
         shell: pwsh
 
       - name: Create release
