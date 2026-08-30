@@ -83,7 +83,7 @@ static void log_close(void) {
     }
 }
 
-static void log_msg(const char* fmt, .. .) {
+static void log_msg(const char* fmt, ...) {
     if (!g_logFile) return;
     va_list args;
     va_start(args, fmt);

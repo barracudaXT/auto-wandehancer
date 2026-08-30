@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using WandEnhancer.Core.Extensions;
 using WandEnhancer.Core.Models;
@@ -77,37 +78,98 @@ namespace WandEnhancer.AutoPatch
                     return true;
                 }
 
-                progress?.Report("Terminating Wand processes...");
-                window?.SetStatus("Terminating Wand processes...");
-                await _processManager.TerminateAllWandProcessesAsync(TimeSpan.FromSeconds(10));
-
-                progress?.Report("Patching Wand...");
-                window?.SetStatus("Patching Wand...");
-                await _patcher.PatchAsync(info, config);
-
-                config.LastPatchedPayloadPath = info.BasePath;
-                config.LastPatchedVersion = info.Version;
-                config.PatchingCompleted = true;
-                _settingsStore.Save(config);
-
-                // Re-register shortcuts after every successful patch — Squirrel may have
-                // overwritten them when installing the new Wand version.
-                try
+                var mutexAcquired = false;
+                using (var patchMutex = new Mutex(false, @"Global\WandEnhancerAutoPatchLock"))
                 {
-                    var autoPatchExePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
-                    var wandRootPath = info.RootPath ?? info.BasePath;
-                    new ShortcutRegistrar().Register(wandRootPath, autoPatchExePath);
-                    _logger.Info("Shortcuts re-registered after patch.");
-                }
-                catch (Exception scEx)
-                {
-                    _logger.Error($"Failed to re-register shortcuts: {scEx.Message}");
-                    // Non-fatal — the patch itself succeeded.
-                }
+                    try
+                    {
+                        try
+                        {
+                            mutexAcquired = patchMutex.WaitOne(0);
+                        }
+                        catch (AbandonedMutexException)
+                        {
+                            mutexAcquired = true;
+                        }
 
-                progress?.Report("Patch completed.");
-                window?.ShowSuccess("Wand patched successfully.");
-                return true;
+                        if (!mutexAcquired)
+                        {
+                            progress?.Report("Waiting for another patch to finish...");
+                            window?.SetStatus("Waiting for another patch to finish...");
+                            try
+                            {
+                                mutexAcquired = patchMutex.WaitOne(TimeSpan.FromSeconds(60));
+                            }
+                            catch (AbandonedMutexException)
+                            {
+                                mutexAcquired = true;
+                            }
+                        }
+
+                        if (!mutexAcquired)
+                        {
+                            _logger.Error("Timed out waiting for patch mutex.");
+                            progress?.Report("Another patch is taking too long. Try again.");
+                            window?.ShowFailure("Another patch is taking too long. Try again.");
+                            return false;
+                        }
+
+                        config = _settingsStore.Load();
+                        info = await _locator.LocateAsync(configuredPath ?? config.Path);
+                        if (info != null && PatchDecision.ShouldSkipPatch(
+                            config.LastPatchedPayloadPath,
+                            config.LastPatchedVersion,
+                            info.BasePath,
+                            info.Version,
+                            PathExtensions.IsAlreadyPatched(info.BasePath)))
+                        {
+                            progress?.Report("Wand is already patched at this version.");
+                            window?.ShowSuccess("Wand is already patched at this version.");
+                            return true;
+                        }
+
+                        if (info == null)
+                        {
+                            progress?.Report("Failed to locate Wand installation.");
+                            window?.ShowFailure("Could not locate Wand. Open WandEnhancer to set the path.");
+                            return false;
+                        }
+
+                        progress?.Report("Terminating Wand processes...");
+                        window?.SetStatus("Terminating Wand processes...");
+                        await _processManager.TerminateAllWandProcessesAsync(TimeSpan.FromSeconds(10));
+
+                        progress?.Report("Patching Wand...");
+                        window?.SetStatus("Patching Wand...");
+                        await _patcher.PatchAsync(info, config);
+
+                        config.LastPatchedPayloadPath = info.BasePath;
+                        config.LastPatchedVersion = info.Version;
+                        config.PatchingCompleted = true;
+                        _settingsStore.Save(config);
+
+                        try
+                        {
+                            var autoPatchExePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                            var wandRootPath = info.RootPath ?? info.BasePath;
+                            new ShortcutRegistrar().Register(wandRootPath, autoPatchExePath);
+                            _logger.Info("Shortcuts re-registered after patch.");
+                        }
+                        catch (Exception scEx)
+                        {
+                            _logger.Error($"Failed to re-register shortcuts: {scEx.Message}");
+                        }
+
+                        progress?.Report("Patch completed.");
+                        window?.ShowSuccess("Wand patched successfully.");
+                        return true;
+                    }
+                    finally
+                    {
+                        if (mutexAcquired)
+                            patchMutex.ReleaseMutex();
+                    }
+                }
             }
             catch (Exception ex)
             {

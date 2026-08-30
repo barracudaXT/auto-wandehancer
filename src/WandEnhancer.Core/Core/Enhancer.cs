@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using System.Text.RegularExpressions;
 using AsarSharp;
 using WandEnhancer.Core.Models;
@@ -254,6 +255,109 @@ namespace WandEnhancer.Core
             _logger($"[ENHANCER] Injected remote panel assets and renderer scripts into app.asar (default: {defaultScriptCount}, selected: {selectedScriptCount}, local: {localScriptCount})", ELogType.Info);
         }
 
+        private static readonly byte[] FuseSentinel =
+            Encoding.ASCII.GetBytes("dL7pKGdnNz796PbbjQWNKmHXBZaB9tsX");
+
+        private const int FuseAsarIntegrityIndex = 4;
+        private const byte FuseStateRemoved = (byte)'r';
+
+        private void PatchElectronFuse()
+        {
+            var exePath = _weModConfig.ExecutablePath;
+            if (!File.Exists(exePath))
+            {
+                _logger("[ENHANCER] Electron executable not found, skipping fuse patch", ELogType.Warn);
+                return;
+            }
+
+            try
+            {
+                using (var fs = new FileStream(exePath, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
+                {
+                    long sentinelPos = FindSentinel(fs, FuseSentinel);
+                    if (sentinelPos < 0)
+                    {
+                        _logger("[ENHANCER] Fuse sentinel not found in executable, skipping fuse patch", ELogType.Warn);
+                        return;
+                    }
+
+                    long headerPos = sentinelPos + FuseSentinel.Length;
+                    fs.Seek(headerPos, SeekOrigin.Begin);
+                    int version = fs.ReadByte();
+                    int wireLength = fs.ReadByte();
+
+                    if (version != 1)
+                    {
+                        _logger($"[ENHANCER] Unsupported fuse version {version}, skipping fuse patch", ELogType.Warn);
+                        return;
+                    }
+
+                    if (wireLength < FuseAsarIntegrityIndex + 1)
+                    {
+                        _logger($"[ENHANCER] Fuse wire too short ({wireLength}), skipping fuse patch", ELogType.Warn);
+                        return;
+                    }
+
+                    long fusePos = headerPos + 2 + FuseAsarIntegrityIndex;
+                    fs.Seek(fusePos, SeekOrigin.Begin);
+                    int currentValue = fs.ReadByte();
+
+                    if (currentValue == FuseStateRemoved)
+                    {
+                        _logger("[ENHANCER] Electron fuse already patched", ELogType.Info);
+                        return;
+                    }
+
+                    fs.Seek(fusePos, SeekOrigin.Begin);
+                    fs.WriteByte(FuseStateRemoved);
+                    _logger("[ENHANCER] Electron fuse patched (asar integrity check disabled)", ELogType.Info);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger($"[ENHANCER] Failed to patch Electron fuse: {ex.Message}", ELogType.Warn);
+            }
+        }
+
+        private static long FindSentinel(FileStream fs, byte[] sentinel)
+        {
+            const int chunkSize = 64 * 1024;
+            var buffer = new byte[chunkSize + sentinel.Length - 1];
+            long filePos = 0;
+
+            while (filePos < fs.Length - sentinel.Length)
+            {
+                fs.Seek(filePos, SeekOrigin.Begin);
+                int bytesRead = fs.Read(buffer, 0, buffer.Length);
+                if (bytesRead < sentinel.Length)
+                    break;
+
+                int searchLen = bytesRead - sentinel.Length + 1;
+                for (int i = 0; i < searchLen; i++)
+                {
+                    if (buffer[i] != sentinel[0])
+                        continue;
+
+                    bool match = true;
+                    for (int j = 1; j < sentinel.Length; j++)
+                    {
+                        if (buffer[i + j] != sentinel[j])
+                        {
+                            match = false;
+                            break;
+                        }
+                    }
+
+                    if (match)
+                        return filePos + i;
+                }
+
+                filePos += bytesRead - sentinel.Length + 1;
+            }
+
+            return -1;
+        }
+
         private void AttachProxyDll()
         {
             var assembly = Assembly.GetExecutingAssembly();
@@ -333,8 +437,9 @@ namespace WandEnhancer.Core
                 throw new Exception($"[ENHANCER] Failed to pack app.asar: {e.Message}");
             }
             
+            PatchElectronFuse();
             AttachProxyDll();
-            
+
             _logger("[ENHANCER] Done!", ELogType.Success);
         }
     }

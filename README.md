@@ -72,7 +72,7 @@ The auto-patch system runs as a lightweight tray application with three modes:
 ### Requirements
 
 - Windows 10/11
-- Visual Studio 2019+ or Build Tools with MSBuild and the C++ workload
+- Visual Studio 2022 or Build Tools for Visual Studio 2022 with MSBuild and the C++ workload
 - .NET Framework 4.8 targeting pack
 - CMake
 - Node.js and pnpm

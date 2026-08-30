@@ -46,7 +46,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -61,7 +61,7 @@ jobs:
         shell: bash
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20
 
@@ -69,19 +69,19 @@ jobs:
         run: npm install -g pnpm
 
       - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v2
+        uses: microsoft/setup-msbuild@v3
 
       - name: Setup NuGet
-        uses: nuget/setup-nuget@v2
+        uses: nuget/setup-nuget@v4
 
       - name: Setup CMake
         uses: lukka/get-cmake@latest
 
       - name: Build native proxy DLL
-        working-directory: src/tools/asar-fuses-bypass
+        working-directory: src
         run: |
-          cmake -B build -A x64
-          cmake --build build --config Release
+          cmake -S tools/asar-fuses-bypass -B .tmp/cmake/asar-fuses-bypass -A x64
+          cmake --build .tmp/cmake/asar-fuses-bypass --config Release
 
       - name: Build web panel
         working-directory: src/web-panel
@@ -120,7 +120,7 @@ jobs:
         shell: pwsh
 
       - name: Create release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: WandEnhancer ${{ steps.version.outputs.tag }}

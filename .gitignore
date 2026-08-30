@@ -6,6 +6,7 @@
 .claude/
 docs/superpowers/
 AGENTS.md
+CLAUDE.md
 
 # Build outputs
 *.exe
