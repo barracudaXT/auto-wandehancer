@@ -1,6 +1,12 @@
 param(
     [ValidateSet('Debug', 'Release')]
-    [string]$Configuration = 'Release'
+    [string]$Configuration = 'Release',
+
+    # Optional Authenticode signing. Supply a PFX to sign the built artifacts;
+    # leave unset and the build behaves exactly as before (unsigned output).
+    [string]$SignPfxPath,
+
+    [string]$SignPfxPassword
 )
 
 $ErrorActionPreference = 'Stop'
@@ -162,6 +168,18 @@ Invoke-Step 'Build installer' {
     $installerScript = Join-Path $repoRoot 'installer\WandEnhancer.iss'
     $installerSource = Join-Path $repoRoot "WandEnhancer\bin\$Configuration"
     & $iscc "/DOutputDir=$installerSource" $installerScript
+}
+
+if (-not [string]::IsNullOrWhiteSpace($SignPfxPath)) {
+    Invoke-Step 'Sign artifacts' {
+        $signScript = Join-Path $repoRoot 'scripts\sign-artifacts.ps1'
+        $distDir = Join-Path $repoRoot '..\dist'
+        & $signScript -Files @(
+            (Join-Path $repoRoot "WandEnhancer\bin\$Configuration\WandEnhancer.exe"),
+            (Join-Path $repoRoot "WandEnhancer\bin\$Configuration\AutoPatch\WandEnhancer.AutoPatch.exe"),
+            (Join-Path $distDir 'WandEnhancerSetup.exe')
+        ) -PfxPath $SignPfxPath -PfxPassword $SignPfxPassword
+    }
 }
 
 Write-Host ''

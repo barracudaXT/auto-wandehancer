@@ -141,6 +141,25 @@ jobs:
           & $iscc "/DMyAppVersion=$appVersion" src\installer\WandEnhancer.iss
         shell: pwsh
 
+      # Signs when SIGNING_CERT_PFX_BASE64 and SIGNING_CERT_PASSWORD repo secrets
+      # are set; otherwise the step is skipped and the release stays unsigned.
+      # A CA-issued certificate is required for this to clear SmartScreen.
+      - name: Sign artifacts
+        if: ${{ secrets.SIGNING_CERT_PFX_BASE64 != '' }}
+        shell: pwsh
+        env:
+          CERT_PFX_BASE64: ${{ secrets.SIGNING_CERT_PFX_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP 'signing.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT_PFX_BASE64))
+          & src\scripts\sign-artifacts.ps1 -Files @(
+            'src\WandEnhancer\bin\Release\WandEnhancer.exe',
+            'src\WandEnhancer\bin\Release\AutoPatch\WandEnhancer.AutoPatch.exe',
+            'dist\WandEnhancerSetup.exe'
+          ) -PfxPath $pfx -PfxPassword $env:CERT_PASSWORD
+          Remove-Item $pfx -Force
+
       - name: Create release
         uses: softprops/action-gh-release@v3
         with:

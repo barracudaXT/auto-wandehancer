@@ -52,7 +52,7 @@
     <Compile Include="PatchModeController.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="ProgressWindow.cs" />
-    <Compile Include="TrayAgent.cs" />
+    <Compile Include="TrayController.cs" />
     <Compile Include="UpdateInstaller.cs" />
     <Compile Include="WatchModeController.cs" />
     <Compile Include="WatchModeOrchestrator.cs" />

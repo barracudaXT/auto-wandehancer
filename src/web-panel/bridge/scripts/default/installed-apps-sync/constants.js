@@ -16,7 +16,8 @@ export const FOLLOW_UP_SYNC_DELAY_MS = 2500
 export const UNAVAILABLE_TITLES_BATCH_SIZE = 250
 export const BOOTSTRAP_LOG_THROTTLE_ATTEMPTS = 5
 // Wand's webpack module exports the trainer-launch-request class under key `vO`.
-// Required so `trainerService.launch(req)` records `getMetadata(vO)` state in Wand. See AGENTS.md "Remote Play".
+// Required so `trainerService.launch(req)` records `getMetadata(vO)` state in Wand;
+// passing a plain object launches the game but breaks Wand's trainer state.
 export const TRAINER_LAUNCH_REQUEST_EXPORT_KEY = "vO"
 export const SNAPSHOT_ENTRY_KEY_PREFIX = Object.freeze({
   TITLE: "title:",

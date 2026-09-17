@@ -50,7 +50,7 @@ namespace WandEnhancer.AutoPatch
         {
             using (var cts = new CancellationTokenSource())
             {
-                var tray = new TrayAgent();
+                var tray = new TrayController();
                 var patchController = new PatchModeController(_settingsStore, _locator, _processManager, _patcher, _logger, tray);
                 var updateChecker = new UpdateChecker(_logger);
                 var updateInstaller = new UpdateInstaller(_logger, tray, updateChecker);
@@ -189,7 +189,7 @@ namespace WandEnhancer.AutoPatch
 
         private void StartPeriodicUpdateCheck(
             UpdateChecker checker,
-            TrayAgent tray,
+            TrayController tray,
             CancellationToken token,
             Action<UpdateInfo> setPending)
         {

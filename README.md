@@ -33,7 +33,7 @@ All upstream features (patching, auto-patch watcher, remote web panel, custom sc
 
 The installer sets up everything: the main app, the auto-patch watcher (system tray), the Wand shortcut replacement, and the scheduled task.
 
-> **Note:** The installer is unsigned, so Windows SmartScreen may warn you. This is expected for self-built patching tools.
+> **Note:** The installer is unsigned, so Windows SmartScreen may warn you. This is expected for self-built patching tools. The build supports Authenticode signing via `scripts/sign-artifacts.ps1` (see Building from Source) — a certificate issued by a trusted CA is what removes the warning; a self-signed one does not.
 
 ## Updating
 

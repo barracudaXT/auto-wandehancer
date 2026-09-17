@@ -5,7 +5,7 @@ using WandEnhancer.Core.Services;
 
 namespace WandEnhancer.AutoPatch
 {
-    public class TrayAgent : ApplicationContext, INotificationService
+    public class TrayController : ApplicationContext, INotificationService
     {
         private readonly NotifyIcon _icon;
         private readonly ToolStripMenuItem _enabledMenuItem;
@@ -26,7 +26,7 @@ namespace WandEnhancer.AutoPatch
 
         private bool _updatePending;
 
-        public TrayAgent()
+        public TrayController()
         {
             _icon = new NotifyIcon
             {
