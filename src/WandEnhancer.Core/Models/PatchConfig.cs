@@ -28,6 +28,10 @@ namespace WandEnhancer.Core.Models
 
         public bool AutoApplyPatches { get; set; }
 
+        // Whether the auto-patch watcher should run. Persisted so the tray toggle
+        // survives a restart instead of silently re-enabling itself.
+        public bool WatcherEnabled { get; set; } = true;
+
         public bool PatchingCompleted { get; set; }
 
         // The resolved payload folder (e.g. ...\app-12.44.0) and Wand version that

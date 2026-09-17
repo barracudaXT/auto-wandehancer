@@ -44,6 +44,7 @@ namespace WandEnhancer.Core.Tests
                 Assert.AreEqual(1, loaded.CustomScriptPaths.Count);
                 Assert.AreEqual("script.js", loaded.CustomScriptPaths[0]);
                 Assert.IsTrue(loaded.AutoApplyPatches);
+                Assert.IsTrue(loaded.WatcherEnabled, "Watcher must default to enabled");
                 Assert.AreEqual(tempDir, loaded.Path);
                 Assert.AreEqual(tempDir, loaded.LastPatchedPayloadPath);
                 Assert.AreEqual("12.44.0", loaded.LastPatchedVersion);
@@ -98,6 +99,52 @@ namespace WandEnhancer.Core.Tests
             {
                 if (Directory.Exists(Path.GetDirectoryName(path)))
                     Directory.Delete(Path.GetDirectoryName(path), recursive: true);
+            }
+        }
+
+        [Test]
+        public void Load_WithoutWatcherEnabled_DefaultsToEnabled()
+        {
+            // Settings files written before WatcherEnabled existed must not silently
+            // pause the watcher on upgrade. This is a real regression risk: a missing
+            // bool deserialising to false would disable auto-patch for every existing user.
+            var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".json");
+            try
+            {
+                File.WriteAllText(path, "{\"PatchTypes\":[1],\"AutoApplyPatches\":false}");
+                var loaded = new SettingsStore(path).Load();
+                Assert.IsTrue(loaded.WatcherEnabled, "Legacy settings without WatcherEnabled must default to enabled");
+            }
+            finally
+            {
+                File.Delete(path);
+                File.Delete(path + ".backup");
+                File.Delete(path + ".tmp");
+                File.Delete(path + ".lock");
+            }
+        }
+
+        [Test]
+        public void WatcherEnabled_DisabledStateRoundTrips()
+        {
+            var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".json");
+            try
+            {
+                var store = new SettingsStore(path);
+                store.Save(new PatchConfig
+                {
+                    PatchTypes = new HashSet<EPatchType> { EPatchType.ActivatePro },
+                    WatcherEnabled = false
+                });
+
+                Assert.IsFalse(store.Load().WatcherEnabled, "A paused watcher must stay paused across restarts");
+            }
+            finally
+            {
+                File.Delete(path);
+                File.Delete(path + ".backup");
+                File.Delete(path + ".tmp");
+                File.Delete(path + ".lock");
             }
         }
 

@@ -1,12 +1,5 @@
-# Tool-generated
-.superpowers/
-.codegraph/
-.hermes/
-.tokensave/
-.claude/
-docs/superpowers/
-AGENTS.md
-CLAUDE.md
+# Local tooling and editor debris — patterns live in .git/info/exclude (untracked)
+# so this file stays free of developer-machine specifics.
 
 # Build outputs
 *.exe

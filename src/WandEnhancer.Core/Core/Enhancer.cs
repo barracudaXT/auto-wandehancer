@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using AsarSharp;
 using WandEnhancer.Core.Models;
 
@@ -28,6 +29,13 @@ namespace WandEnhancer.Core
         private const string JavaScriptFileSearchPattern = "*.js";
         private const string DuplicateScriptSuffix = ".custom";
         private const int FirstDuplicateScriptIndex = 1;
+
+        // Squirrel/Electron can keep a handle on resources\*.asar for a moment after
+        // Wand's processes are closed, which used to abort the whole patch with
+        // "used by another process". Retrying in place is the smallest thing that
+        // survives that race; the handle is released well inside this window.
+        private const int FileRetryAttempts = 10;
+        private const int FileRetryDelayMs = 500;
 
         private readonly WeModConfig _weModConfig;
         private readonly Action<string, ELogType> _logger;
@@ -374,33 +382,78 @@ namespace WandEnhancer.Core
             _logger("[ENHANCER] Proxy DLL attached", ELogType.Info);
         }
 
+        /// <summary>
+        /// Runs <paramref name="action"/>, retrying on a sharing violation while another
+        /// process (Squirrel, antivirus, or a second patch run) still holds the file.
+        /// The exception is rethrown once the attempts are exhausted.
+        /// </summary>
+        // ponytail: retries every IOException, not only sharing violations, so an
+        // unrecoverable error (disk full, bad path) also burns the ~4.5s window before
+        // surfacing. Harmless because it still surfaces; narrow to HResult
+        // ERROR_SHARING_VIOLATION/ERROR_LOCK_VIOLATION if that delay ever matters.
+        private void WithFileRetry(string what, Action action)
+        {
+            for (int attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    action();
+                    return;
+                }
+                catch (IOException ex) when (attempt < FileRetryAttempts)
+                {
+                    _logger($"[ENHANCER] {what} blocked by another process, retrying in {FileRetryDelayMs}ms (attempt {attempt}/{FileRetryAttempts - 1}): {ex.Message.Trim()}", ELogType.Warn);
+                    Thread.Sleep(FileRetryDelayMs);
+                }
+            }
+        }
+
         public void Patch()
         {
             if (!File.Exists(_backupPath))
             {
                 _logger("[ENHANCER] Creating backup...", ELogType.Info);
-                File.Copy(_asarPath, _backupPath);
+                // Stage the copy beside the destination and move it into place only once it
+                // is complete. A direct File.Copy that fails partway leaves a truncated
+                // app.asar.backup, and the next run's restore branch would then copy that
+                // damaged file over the live archive. Staging also lets a retry replace the
+                // leftover staging file instead of failing with "file already exists",
+                // which previously defeated the retry loop entirely.
+                WithFileRetry("Creating app.asar backup", () =>
+                {
+                    var stagingPath = _backupPath + ".part";
+                    File.Copy(_asarPath, stagingPath, true);
+                    if (File.Exists(_backupPath))
+                    {
+                        File.Delete(_backupPath);
+                    }
+
+                    File.Move(stagingPath, _backupPath);
+                });
             }
             else
             {
                 _logger("[ENHANCER] Backup found, restoring pristine app.asar before patching...", ELogType.Info);
-                File.Copy(_backupPath, _asarPath, true);
+                WithFileRetry("Restoring pristine app.asar", () => File.Copy(_backupPath, _asarPath, true));
             }
 
             if (!Directory.Exists(_unpackedBackupPath) && Directory.Exists(_unpackedPath))
             {
                 _logger("[ENHANCER] Creating backup of app.asar.unpacked...", ELogType.Info);
-                CopyDirectory(_unpackedPath, _unpackedBackupPath);
+                WithFileRetry("Backing up app.asar.unpacked", () => CopyDirectory(_unpackedPath, _unpackedBackupPath));
             }
             else if (Directory.Exists(_unpackedBackupPath))
             {
                 _logger("[ENHANCER] Restoring pristine app.asar.unpacked before patching...", ELogType.Info);
-                if (Directory.Exists(_unpackedPath))
+                WithFileRetry("Restoring app.asar.unpacked", () =>
                 {
-                    Directory.Delete(_unpackedPath, true);
-                }
+                    if (Directory.Exists(_unpackedPath))
+                    {
+                        Directory.Delete(_unpackedPath, true);
+                    }
 
-                CopyDirectory(_unpackedBackupPath, _unpackedPath);
+                    CopyDirectory(_unpackedBackupPath, _unpackedPath);
+                });
             }
             else if (!Directory.Exists(_unpackedPath))
             {
@@ -427,10 +480,11 @@ namespace WandEnhancer.Core
 
             try
             {
-                new AsarCreator(_unpackedPath, _asarPath, new CreateOptions
-                {
-                    Unpack = new Regex(@"^static\\unpacked.*$")
-                }).CreatePackageWithOptions();
+                WithFileRetry("Packing app.asar", () =>
+                    new AsarCreator(_unpackedPath, _asarPath, new CreateOptions
+                    {
+                        Unpack = new Regex(@"^static\\unpacked.*$")
+                    }).CreatePackageWithOptions());
             }
             catch (Exception e)
             {

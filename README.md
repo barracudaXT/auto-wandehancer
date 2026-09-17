@@ -18,6 +18,13 @@ This fork of [Wand-Enhancer](https://github.com/k1tbyte/Wand-Enhancer) adds:
 
 All upstream features (patching, auto-patch watcher, remote web panel, custom scripts) work the same as in the original project.
 
+> **Upstream version.** This fork is based on upstream **1.0.9.4**. Upstream **2.0.0.0** was a
+> rewrite — a structural patch engine, a launcher that replaces the Squirrel stub, and its own
+> update notifier — and it moved the source tree to the repository root. The mirror workflow
+> builds `src/`, so upstream 2.x changes never reach a build here. Until the fork is re-based
+> onto the 2.x layout, releases stay on the 1.0.9.4 line, and the workflow now **fails loudly**
+> rather than publishing an unchanged build under a new upstream tag.
+
 ## Installation
 
 1. Download **WandEnhancerSetup.exe** from the [latest release](https://github.com/barracudaXT/auto-wandehancer/releases/latest).

@@ -53,7 +53,7 @@ namespace WandEnhancer.AutoPatch
                 var tray = new TrayAgent();
                 var patchController = new PatchModeController(_settingsStore, _locator, _processManager, _patcher, _logger, tray);
                 var updateChecker = new UpdateChecker(_logger);
-                var updateInstaller = new UpdateInstaller(_logger, tray);
+                var updateInstaller = new UpdateInstaller(_logger, tray, updateChecker);
                 UpdateInfo pendingUpdate = null;
                 Task watchTask = null;
 
@@ -79,7 +79,34 @@ namespace WandEnhancer.AutoPatch
                         cts.Cancel();
                         Application.Exit();
                     };
-                    tray.WatcherEnabledChanged += (s, e) => watchController.Enabled = tray.WatcherEnabled;
+                    tray.WatcherEnabledChanged += (s, e) =>
+                    {
+                        watchController.Enabled = tray.WatcherEnabled;
+                        try
+                        {
+                            var config = _settingsStore.Load();
+                            config.WatcherEnabled = tray.WatcherEnabled;
+                            _settingsStore.Save(config);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.Error($"Failed to persist watcher state: {ex.Message}");
+                        }
+                    };
+
+                    // Restore the persisted watcher state before the watcher starts,
+                    // so a paused watcher stays paused across restarts.
+                    var initialWatcherEnabled = true;
+                    try
+                    {
+                        initialWatcherEnabled = _settingsStore.Load().WatcherEnabled;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Error($"Failed to read watcher state, defaulting to enabled: {ex.Message}");
+                    }
+                    tray.WatcherEnabled = initialWatcherEnabled;
+                    watchController.Enabled = initialWatcherEnabled;
 
                     tray.CheckForUpdatesClicked += (s, e) =>
                     {

@@ -51,19 +51,38 @@ jobs:
           fetch-depth: 0
 
       - name: Sync upstream source
+        id: sync
         if: needs.check-upstream.outputs.new_version == 'true'
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          git remote add upstream https://github.com/k1tbyte/Wand-Enhancer.git
+          echo "pre_merge=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git remote add upstream https://github.com/k1tbyte/Wand-Enhancer.git || true
           git fetch upstream
           git merge upstream/master -X ours --no-edit --allow-unrelated-histories || echo "Merge had conflicts; building with current source."
         shell: bash
 
+      # This fork builds src/, but upstream 2.x moved its tree to the repository root,
+      # so the merge above can succeed while changing nothing we actually compile.
+      # Without this gate the job would publish a release tagged with the new upstream
+      # version while shipping the old code. Fail loudly instead — re-basing is a human
+      # decision, not something to paper over.
+      - name: Verify the sync landed under src
+        if: needs.check-upstream.outputs.new_version == 'true'
+        run: |
+          if git diff --quiet "${{ steps.sync.outputs.pre_merge }}" HEAD -- src/; then
+            echo "::error::Upstream ${{ needs.check-upstream.outputs.upstream_tag }} was detected but syncing it changed nothing under src/. The fork builds src/ while upstream 2.x lives at the repository root, so publishing this run would tag unchanged code as the new upstream version. Re-base the fork onto upstream's layout before releasing."
+            exit 1
+          fi
+        shell: bash
+
+      # Node >= 22.19 is required by @lingui/cli 6.3 (ESM-imports globSync from node:fs),
+      # which vite.config.ts loads via @lingui/vite-plugin. On Node 20 the config fails to
+      # load and `vite build` aborts before any of the build steps below run.
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install pnpm
         run: npm install -g pnpm
@@ -116,7 +135,10 @@ jobs:
             choco install innosetup -y --no-progress
             $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           }
-          & $iscc src\installer\WandEnhancer.iss
+          # Strip the leading "v" from the tag (GitHub tags are "v1.0.9.4") so the
+          # version shown in Add/Remove Programs is plain "1.0.9.4".
+          $appVersion = "${{ steps.version.outputs.tag }}" -replace '^v',''
+          & $iscc "/DMyAppVersion=$appVersion" src\installer\WandEnhancer.iss
         shell: pwsh
 
       - name: Create release

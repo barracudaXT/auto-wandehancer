@@ -46,6 +46,8 @@
   <ItemGroup>
     <Compile Include="Fakes.cs" />
     <Compile Include="UpdateDetectionTests.cs" />
+    <Compile Include="UpdateIntegrityTests.cs" />
+    <Compile Include="EnhancerFileRetryTests.cs" />
     <Compile Include="PatchDecisionTests.cs" />
     <Compile Include="PatchEngineTests.cs" />
     <Compile Include="ProcessManagerTests.cs" />
