@@ -107,14 +107,15 @@ namespace WandEnhancer.Core.Services
         }
 
         /// <summary>
-        /// Downloads the installer and verifies it against the SHA-256 GitHub publishes
-        /// for the release asset. Returns an open read handle on success, or null if the
-        /// digest is missing or does not match.
+        /// Downloads the installer, verifies it against the SHA-256 GitHub publishes for
+        /// the release asset, and returns a read handle on the verified bytes. Returns
+        /// null (refusing to install) when the digest is absent or does not match.
         ///
-        /// The returned handle is held with FileShare.Read: the caller keeps it open
-        /// through the elevated launch so the binary cannot be swapped between
-        /// verification and execution, while the installer process can still read it.
-        /// FileShare.Read denies the FILE_SHARE_DELETE a rename-based substitution needs.
+        /// The handle is opened with FileShare.Read and stays open for as long as the
+        /// caller holds it. It permits the elevated installer process to read the file,
+        /// while withholding the FILE_SHARE_DELETE a rename-based substitution needs.
+        /// The handle is re-hashed after opening so that the bytes handed to the caller
+        /// are the bytes that were verified, not merely a file that once matched.
         /// The caller owns the handle and must dispose it.
         /// </summary>
         public async Task<FileStream> DownloadAndVerifyAsync(UpdateInfo update, CancellationToken token, IProgress<int> progress = null)
@@ -138,53 +139,73 @@ namespace WandEnhancer.Core.Services
             {
                 _logger.Info($"Downloading update {update.TagName} from {update.DownloadUrl}");
 
-                string actual = null;
+                string written;
                 using (var response = await HttpClient.GetAsync(update.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, token))
                 {
                     response.EnsureSuccessStatusCode();
                     var totalBytes = response.Content.Headers.ContentLength;
 
-                // Hash from the same handle that wrote the file, while it is still open
-                // and exclusively held, so no other process can substitute the content
-                // between writing and verification.
-                using (var contentStream = await response.Content.ReadAsStreamAsync())
-                using (var fileStream = new FileStream(installerPath, FileMode.Create, FileAccess.ReadWrite, FileShare.None, 8192, true))
-                {
-                    var buffer = new byte[8192];
-                    long bytesRead = 0;
-                    int read;
-
-                    while ((read = await contentStream.ReadAsync(buffer, 0, buffer.Length, token)) > 0)
+                    // Hash from the handle that wrote the file, so the digest describes the
+                    // bytes we actually wrote rather than a re-read of the path.
+                    using (var contentStream = await response.Content.ReadAsStreamAsync())
+                    using (var fileStream = new FileStream(installerPath, FileMode.Create, FileAccess.ReadWrite, FileShare.None, 8192, true))
                     {
-                        await fileStream.WriteAsync(buffer, 0, read, token);
-                        bytesRead += read;
+                        var buffer = new byte[8192];
+                        long bytesRead = 0;
+                        int read;
 
-                        if (progress != null && totalBytes.HasValue && totalBytes.Value > 0)
+                        while ((read = await contentStream.ReadAsync(buffer, 0, buffer.Length, token)) > 0)
                         {
-                            progress.Report((int)(bytesRead * 100 / totalBytes.Value));
-                        }
-                    }
+                            await fileStream.WriteAsync(buffer, 0, read, token);
+                            bytesRead += read;
 
-                    fileStream.Flush(true);
-                    actual = ComputeSha256(fileStream);
-                }
+                            if (progress != null && totalBytes.HasValue && totalBytes.Value > 0)
+                            {
+                                progress.Report((int)(bytesRead * 100 / totalBytes.Value));
+                            }
+                        }
+
+                        fileStream.Flush(true);
+                        written = ComputeSha256(fileStream);
+                    }
                 }
 
                 if (token.IsCancellationRequested)
                     return null;
 
-                if (!string.Equals(actual, update.Sha256, StringComparison.OrdinalIgnoreCase))
+                if (!string.Equals(written, update.Sha256, StringComparison.OrdinalIgnoreCase))
                 {
-                    _logger.Error($"Update digest mismatch (expected {update.Sha256}, got {actual}). Refusing to install.");
+                    _logger.Error($"Update digest mismatch (expected {update.Sha256}, got {written}). Refusing to install.");
                     TryDelete(installerPath);
                     return null;
                 }
 
-                _logger.Info($"Update digest verified ({actual}).");
+                // Open the handle the caller keeps, and hash THAT stream. The exclusive
+                // writing handle has to be released to open for shared read, so this
+                // re-check is what guarantees the bytes handed on are the verified bytes:
+                // if anything was swapped in that gap, the digest will not match again.
+                var verified = new FileStream(installerPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                string reopened;
+                try
+                {
+                    reopened = ComputeSha256(verified);
+                }
+                catch
+                {
+                    verified.Dispose();
+                    throw;
+                }
 
-                // Reopen read-only with FileShare.Read and hand the handle to the caller so
-                // verification and execution cannot be separated by a substitution.
-                return new FileStream(installerPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                if (!string.Equals(reopened, update.Sha256, StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.Error($"Update digest changed after download (expected {update.Sha256}, got {reopened}). Refusing to install.");
+                    verified.Dispose();
+                    TryDelete(installerPath);
+                    return null;
+                }
+
+                _logger.Info($"Update digest verified ({reopened}).");
+                return verified;
             }
             catch (OperationCanceledException)
             {
@@ -199,7 +220,7 @@ namespace WandEnhancer.Core.Services
             catch (Exception ex)
             {
                 _logger.Error($"Update download/verify failed: {ex.Message}");
-                try { File.Delete(installerPath); } catch { }
+                TryDelete(installerPath);
                 return null;
             }
         }
@@ -219,6 +240,7 @@ namespace WandEnhancer.Core.Services
 
         public static string ComputeSha256(Stream stream)
         {
+            if (stream.CanSeek) stream.Position = 0;
             using (var sha = SHA256.Create())
             {
                 return ToHex(sha.ComputeHash(stream));
