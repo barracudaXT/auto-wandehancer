@@ -122,25 +122,16 @@ jobs:
           echo "tag=v$ver" >> $env:GITHUB_OUTPUT
         shell: pwsh
 
-      - name: Build installer
-        run: |
-          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $iscc)) {
-            choco install innosetup -y --no-progress
-            $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          }
-          # Strip the leading "v" from the tag (GitHub tags are "v1.0.9.4") so the
-          # version shown in Add/Remove Programs is plain "1.0.9.4".
-          $appVersion = "${{ steps.version.outputs.tag }}" -replace '^v',''
-          & $iscc "/DMyAppVersion=$appVersion" installer\WandEnhancer.iss
-        shell: pwsh
-
       # Signs when SIGNING_CERT_PFX_BASE64 and SIGNING_CERT_PASSWORD repo secrets
       # are set; otherwise the step no-ops and the release stays unsigned.
       # A CA-issued certificate is required for this to clear SmartScreen.
       # The check lives in the script, not in `if:` — the secrets context is not
       # available to a step-level condition and using it invalidates the workflow.
-      - name: Sign artifacts
+      #
+      # The executables are signed BEFORE the installer is built, so the installer
+      # packages signed binaries and is itself signed over a deterministic payload.
+      # The installer is signed in a second pass afterwards.
+      - name: Sign executables
         shell: pwsh
         env:
           CERT_PFX_BASE64: ${{ secrets.SIGNING_CERT_PFX_BASE64 }}
@@ -154,10 +145,32 @@ jobs:
           [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT_PFX_BASE64))
           & scripts\sign-artifacts.ps1 -Files @(
             'WandEnhancer\bin\Release\WandEnhancer.exe',
-            'WandEnhancer.AutoPatch\bin\Release\WandEnhancer.AutoPatch.exe',
-            'dist\WandEnhancerSetup.exe'
+            'WandEnhancer.AutoPatch\bin\Release\WandEnhancer.AutoPatch.exe'
           ) -PfxPath $pfx -PfxPassword $env:CERT_PASSWORD
-          Remove-Item $pfx -Force
+
+      - name: Build installer
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+            $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          }
+          # Strip the leading "v" from the tag (GitHub tags are "v1.0.9.4") so the
+          # version shown in Add/Remove Programs is plain "1.0.9.4".
+          $appVersion = "${{ steps.version.outputs.tag }}" -replace '^v',''
+          & $iscc "/DMyAppVersion=$appVersion" installer\WandEnhancer.iss
+        shell: pwsh
+
+      - name: Sign installer
+        shell: pwsh
+        env:
+          CERT_PFX_BASE64: ${{ secrets.SIGNING_CERT_PFX_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:CERT_PFX_BASE64)) { return }
+          & scripts\sign-artifacts.ps1 -Files @('dist\WandEnhancerSetup.exe') `
+            -PfxPath (Join-Path $env:RUNNER_TEMP 'signing.pfx') -PfxPassword $env:CERT_PASSWORD
+          Remove-Item (Join-Path $env:RUNNER_TEMP 'signing.pfx') -Force
 
       - name: Create release
         uses: softprops/action-gh-release@v3

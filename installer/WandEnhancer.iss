@@ -1,6 +1,6 @@
 ; WandEnhancer installer with one-click auto-patch enablement.
-; Build from the repo root with:
-;   iscc src\installer\WandEnhancer.iss /DOutputDir=src\WandEnhancer\bin\Release
+; Build from the repository root with:
+;   iscc installer\WandEnhancer.iss /DOutputDir=WandEnhancer\bin\Release
 
 #define MyAppName "WandEnhancer"
 ; Keep in step with the AssemblyVersion in the projects under ..\ (WandEnhancer,
@@ -29,7 +29,7 @@ DefaultDirName={autopf}\{#MyAppName}
 DisableProgramGroupPage=yes
 LicenseFile=..\LICENSE.md
 PrivilegesRequired=admin
-OutputDir=..\..\dist
+OutputDir=..\dist
 OutputBaseFilename=WandEnhancerSetup
 SetupIconFile=..\assets\appicon.ico
 Compression=lzma
@@ -46,10 +46,10 @@ Name: "autopatch"; Description: "Keep Wand patched automatically after updates";
 
 [Files]
 Source: "{#OutputDir}\WandEnhancer.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\WandEnhancer.AutoPatchin\Release\WandEnhancer.AutoPatch.exe"; DestDir: "{app}\AutoPatch"; Flags: ignoreversion
-Source: "..\WandEnhancer.AutoPatchin\Release\WandEnhancer.Core.dll"; DestDir: "{app}\AutoPatch"; Flags: ignoreversion
-Source: "..\WandEnhancer.AutoPatchin\Release\Newtonsoft.Json.dll"; DestDir: "{app}\AutoPatch"; Flags: ignoreversion
-Source: "..\WandEnhancer.AutoPatchin\Release\AsarSharp.dll"; DestDir: "{app}\AutoPatch"; Flags: ignoreversion
+Source: "..\WandEnhancer.AutoPatch\bin\Release\WandEnhancer.AutoPatch.exe"; DestDir: "{app}\AutoPatch"; Flags: ignoreversion
+Source: "..\WandEnhancer.AutoPatch\bin\Release\WandEnhancer.Core.dll"; DestDir: "{app}\AutoPatch"; Flags: ignoreversion
+Source: "..\WandEnhancer.AutoPatch\bin\Release\Newtonsoft.Json.dll"; DestDir: "{app}\AutoPatch"; Flags: ignoreversion
+Source: "..\WandEnhancer.AutoPatch\bin\Release\AsarSharp.dll"; DestDir: "{app}\AutoPatch"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

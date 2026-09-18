@@ -133,41 +133,40 @@ namespace WandEnhancer.Core.Services
             {
                 _logger.Info($"Downloading update {update.TagName} from {update.DownloadUrl}");
 
+                string actual = null;
                 using (var response = await HttpClient.GetAsync(update.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, token))
                 {
                     response.EnsureSuccessStatusCode();
                     var totalBytes = response.Content.Headers.ContentLength;
 
-                    using (var contentStream = await response.Content.ReadAsStreamAsync())
-                    using (var fileStream = new FileStream(installerPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
+                // Hash from the same handle that wrote the file, while it is still open
+                // and exclusively held, so no other process can substitute the content
+                // between writing and verification.
+                using (var contentStream = await response.Content.ReadAsStreamAsync())
+                using (var fileStream = new FileStream(installerPath, FileMode.Create, FileAccess.ReadWrite, FileShare.None, 8192, true))
+                {
+                    var buffer = new byte[8192];
+                    long bytesRead = 0;
+                    int read;
+
+                    while ((read = await contentStream.ReadAsync(buffer, 0, buffer.Length, token)) > 0)
                     {
-                        var buffer = new byte[8192];
-                        long bytesRead = 0;
-                        int read;
+                        await fileStream.WriteAsync(buffer, 0, read, token);
+                        bytesRead += read;
 
-                        while ((read = await contentStream.ReadAsync(buffer, 0, buffer.Length, token)) > 0)
+                        if (progress != null && totalBytes.HasValue && totalBytes.Value > 0)
                         {
-                            await fileStream.WriteAsync(buffer, 0, read, token);
-                            bytesRead += read;
-
-                            if (progress != null && totalBytes.HasValue && totalBytes.Value > 0)
-                            {
-                                progress.Report((int)(bytesRead * 100 / totalBytes.Value));
-                            }
+                            progress.Report((int)(bytesRead * 100 / totalBytes.Value));
                         }
                     }
+
+                    fileStream.Flush(true);
+                    actual = ComputeSha256(fileStream);
+                }
                 }
 
                 if (token.IsCancellationRequested)
                     return null;
-
-                // Hash the file we actually wrote, via the same helper the unit tests
-                // cover, so the verification path has no untested crypto plumbing.
-                string actual;
-                using (var hashStream = File.OpenRead(installerPath))
-                {
-                    actual = ComputeSha256(hashStream);
-                }
 
                 if (!string.Equals(actual, update.Sha256, StringComparison.OrdinalIgnoreCase))
                 {

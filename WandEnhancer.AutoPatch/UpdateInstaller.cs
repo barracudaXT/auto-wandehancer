@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using WandEnhancer.Core.Services;
@@ -55,7 +56,16 @@ namespace WandEnhancer.AutoPatch
                     Verb = "runas"
                 };
 
-                Process.Start(psi);
+                // Hold the file with NO sharing from verification until the elevated
+                // installer has been started. FileShare.None denies the rename/delete that
+                // a substitution attempt would need in the window between hashing and
+                // elevation. (The elevation dialog is user-interactive, so this is a real
+                // window, not a theoretical one.)
+                using (var guard = new FileStream(installerPath, FileMode.Open, FileAccess.Read, FileShare.None))
+                {
+                    Process.Start(psi);
+                }
+
                 return true;
             }
             catch (Exception ex)
