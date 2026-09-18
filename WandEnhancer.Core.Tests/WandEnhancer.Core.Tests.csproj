@@ -50,6 +50,7 @@
     <Compile Include="Fakes.cs" />
     <Compile Include="UpdateDetectionTests.cs" />
     <Compile Include="UpdateIntegrityTests.cs" />
+    <Compile Include="UpdateHandoffTests.cs" />
     <Compile Include="PatchDecisionTests.cs" />
     <Compile Include="ProcessManagerTests.cs" />
     <Compile Include="SettingsStoreTests.cs" />

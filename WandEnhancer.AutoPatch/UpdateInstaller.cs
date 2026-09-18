@@ -32,47 +32,46 @@ namespace WandEnhancer.AutoPatch
 
             _notification.ShowInfo("WandEnhancer", $"Downloading update {update.TagName}...");
 
-            // DownloadAndVerifyAsync refuses to hand back a path whose SHA-256 does not
-            // match the digest GitHub publishes for the asset.
-            var installerPath = await _checker.DownloadAndVerifyAsync(update, token, progress);
-            if (string.IsNullOrEmpty(installerPath))
+            // DownloadAndVerifyAsync returns an open handle it has already verified, so the
+            // verified bytes and the executed bytes cannot be separated.
+            var verifiedInstaller = await _checker.DownloadAndVerifyAsync(update, token, progress);
+            if (verifiedInstaller == null)
             {
                 _notification.ShowError("WandEnhancer",
                     "Update could not be verified and was not installed. Will retry later.");
                 return false;
             }
 
-            progress?.Report(-1);
-            _notification.ShowInfo("WandEnhancer", "Installing update...");
-            _logger.Info($"Running verified installer: {installerPath}");
-
-            try
+            // The handle stays open until the elevated process exists. It is a read-only
+            // share, so the installer can still read the file while a rename-based
+            // substitution remains blocked (no FILE_SHARE_DELETE).
+            using (verifiedInstaller)
             {
-                var psi = new ProcessStartInfo
-                {
-                    FileName = installerPath,
-                    Arguments = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS",
-                    UseShellExecute = true,
-                    Verb = "runas"
-                };
+                var installerPath = verifiedInstaller.Name;
 
-                // Hold the file with NO sharing from verification until the elevated
-                // installer has been started. FileShare.None denies the rename/delete that
-                // a substitution attempt would need in the window between hashing and
-                // elevation. (The elevation dialog is user-interactive, so this is a real
-                // window, not a theoretical one.)
-                using (var guard = new FileStream(installerPath, FileMode.Open, FileAccess.Read, FileShare.None))
+                progress?.Report(-1);
+                _notification.ShowInfo("WandEnhancer", "Installing update...");
+                _logger.Info($"Running verified installer: {installerPath}");
+
+                try
                 {
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = installerPath,
+                        Arguments = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS",
+                        UseShellExecute = true,
+                        Verb = "runas"
+                    };
+
                     Process.Start(psi);
+                    return true;
                 }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Update install failed: {ex.Message}");
-                _notification.ShowError("WandEnhancer", $"Update failed: {ex.Message}");
-                return false;
+                catch (Exception ex)
+                {
+                    _logger.Error($"Update install failed: {ex.Message}");
+                    _notification.ShowError("WandEnhancer", $"Update failed: {ex.Message}");
+                    return false;
+                }
             }
         }
     }

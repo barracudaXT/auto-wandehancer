@@ -108,11 +108,16 @@ namespace WandEnhancer.Core.Services
 
         /// <summary>
         /// Downloads the installer and verifies it against the SHA-256 GitHub publishes
-        /// for the release asset. Returns the local path, or null if the digest is
-        /// missing or does not match. Nothing may be executed before this passes: the
-        /// installer is run elevated with /VERYSILENT.
+        /// for the release asset. Returns an open read handle on success, or null if the
+        /// digest is missing or does not match.
+        ///
+        /// The returned handle is held with FileShare.Read: the caller keeps it open
+        /// through the elevated launch so the binary cannot be swapped between
+        /// verification and execution, while the installer process can still read it.
+        /// FileShare.Read denies the FILE_SHARE_DELETE a rename-based substitution needs.
+        /// The caller owns the handle and must dispose it.
         /// </summary>
-        public async Task<string> DownloadAndVerifyAsync(UpdateInfo update, CancellationToken token, IProgress<int> progress = null)
+        public async Task<FileStream> DownloadAndVerifyAsync(UpdateInfo update, CancellationToken token, IProgress<int> progress = null)
         {
             if (update == null || string.IsNullOrEmpty(update.DownloadUrl))
                 return null;
@@ -176,7 +181,10 @@ namespace WandEnhancer.Core.Services
                 }
 
                 _logger.Info($"Update digest verified ({actual}).");
-                return installerPath;
+
+                // Reopen read-only with FileShare.Read and hand the handle to the caller so
+                // verification and execution cannot be separated by a substitution.
+                return new FileStream(installerPath, FileMode.Open, FileAccess.Read, FileShare.Read);
             }
             catch (OperationCanceledException)
             {
