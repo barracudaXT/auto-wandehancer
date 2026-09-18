@@ -46,20 +46,20 @@ Name: "autopatch"; Description: "Keep Wand patched automatically after updates";
 
 [Files]
 Source: "{#OutputDir}\WandEnhancer.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#OutputDir}\AutoPatch\WandEnhancer.AutoPatch.exe"; DestDir: "{app}\AutoPatch"; Flags: ignoreversion
-Source: "{#OutputDir}\AutoPatch\WandEnhancer.Core.dll"; DestDir: "{app}\AutoPatch"; Flags: ignoreversion
-Source: "{#OutputDir}\AutoPatch\Newtonsoft.Json.dll"; DestDir: "{app}\AutoPatch"; Flags: ignoreversion
-Source: "{#OutputDir}\AutoPatch\AsarSharp.dll"; DestDir: "{app}\AutoPatch"; Flags: ignoreversion
+Source: "..\WandEnhancer.AutoPatchin\Release\WandEnhancer.AutoPatch.exe"; DestDir: "{app}\AutoPatch"; Flags: ignoreversion
+Source: "..\WandEnhancer.AutoPatchin\Release\WandEnhancer.Core.dll"; DestDir: "{app}\AutoPatch"; Flags: ignoreversion
+Source: "..\WandEnhancer.AutoPatchin\Release\Newtonsoft.Json.dll"; DestDir: "{app}\AutoPatch"; Flags: ignoreversion
+Source: "..\WandEnhancer.AutoPatchin\Release\AsarSharp.dll"; DestDir: "{app}\AutoPatch"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--enable-autopatch ""{code:GetWandPath}"""; Description: "Enable auto-patch"; Flags: runascurrentuser waituntilterminated; Check: ShouldEnableAutoPatch
+Filename: "{app}\AutoPatch\WandEnhancer.AutoPatch.exe"; Parameters: "--enable-autopatch ""{code:GetWandPath}"""; Description: "Enable auto-patch"; Flags: runascurrentuser waituntilterminated; Check: ShouldEnableAutoPatch
 
 [UninstallRun]
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--disable-autopatch"; Flags: runascurrentuser waituntilterminated; RunOnceId: DisableAutoPatch
+Filename: "{app}\AutoPatch\WandEnhancer.AutoPatch.exe"; Parameters: "--disable-autopatch"; Flags: runascurrentuser waituntilterminated; RunOnceId: DisableAutoPatch
 
 [Code]
 var

@@ -69,6 +69,8 @@
     <Compile Include="Services\Patcher.cs" />
     <Compile Include="Services\ProcessManager.cs" />
     <Compile Include="Services\SettingsStore.cs" />
+    <Compile Include="Services\ScheduledTaskRegistrar.cs" />
+    <Compile Include="Services\IScheduledTaskRegistrar.cs" />
     <Compile Include="Services\ShortcutRegistrar.cs" />
     <Compile Include="Services\UpdateChecker.cs" />
     <Compile Include="Services\WeModLocator.cs" />

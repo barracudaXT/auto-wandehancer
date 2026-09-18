@@ -118,5 +118,30 @@ Invoke-Step 'Test structural patch locators' {
     & (Join-Path $repoRoot 'scripts\test-patch-locators.ps1') -AssemblyPath $assemblyPath
 }
 
+# The fork's own test suite. Upstream's build does not know about it, and without
+# this step the fork's tests are built but never executed.
+$forkTestDll = Join-Path $repoRoot "WandEnhancer.Core.Tests\bin\$Configuration\WandEnhancer.Core.Tests.dll"
+if (Test-Path $forkTestDll) {
+    Invoke-Step 'Test fork suite' {
+        $nunit = Join-Path $repoRoot 'packages\NUnit.ConsoleRunner.3.16.3\tools\nunit3-console.exe'
+        if (-not (Test-Path $nunit)) {
+            $nuget = Resolve-NuGetPath
+            & $nuget install NUnit.ConsoleRunner -Version 3.16.3 -OutputDirectory (Join-Path $repoRoot 'packages') -NonInteractive
+        }
+        & $nunit $forkTestDll --noresult
+    }
+}
+
+# Package the installer, which is the fork's whole reason for existing.
+$iscc = Resolve-InnoSetupPath
+Invoke-Step 'Build installer' {
+    $installerScript = Join-Path $repoRoot 'installer\WandEnhancer.iss'
+    $appVersion = (Get-Content (Join-Path $repoRoot 'WandEnhancer\Properties\AssemblyInfo.cs') |
+        Select-String -Pattern 'AssemblyFileVersion\("([\d.]+)"\)' |
+        ForEach-Object { $_.Matches[0].Groups[1].Value } | Select-Object -First 1)
+    if ([string]::IsNullOrWhiteSpace($appVersion)) { $appVersion = '1.0.0' }
+    & $iscc "/DOutputDir=$(Join-Path $repoRoot "WandEnhancer\bin\$Configuration")" "/DMyAppVersion=$appVersion" $installerScript
+}
+
 Write-Host ''
 Write-Host "Build completed successfully ($Configuration)." -ForegroundColor Green

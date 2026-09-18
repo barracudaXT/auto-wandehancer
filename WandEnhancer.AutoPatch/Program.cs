@@ -25,6 +25,18 @@ namespace WandEnhancer.AutoPatch
             var logDirectory = Path.Combine(appData, "WandEnhancer", "logs");
 
             var logger = new FileLogger(logDirectory);
+
+            // Installer-facing setup commands run before the tray/UI is initialised:
+            // they may re-register shortcuts over the live install and then exit.
+            if (arguments.Mode == "enable-autopatch" || arguments.Mode == "disable-autopatch")
+            {
+                var code = arguments.Mode == "enable-autopatch"
+                    ? AutoPatchSetup.Enable(arguments.WeModPath, logger)
+                    : AutoPatchSetup.Disable(logger);
+                Environment.Exit(code);
+                return;
+            }
+
             var patchLogger = new Action<string, ELogType>((msg, type) => logger.Info(msg));
             var settingsStore = new SettingsStore(settingsPath);
             var locator = new WeModLocator(WandEnhancer.Core.Extensions.PathExtensions.CheckWeModPath, allowManualFallback: false);
@@ -33,7 +45,7 @@ namespace WandEnhancer.AutoPatch
 
             if (string.IsNullOrEmpty(arguments.Mode))
             {
-                MessageBox.Show("Usage: WandEnhancer.AutoPatch.exe --patch [path] | --launch [path] [wand args] | --watch [path]", "WandEnhancer Auto-Patch");
+                MessageBox.Show("Usage: WandEnhancer.AutoPatch.exe --patch [path] | --launch [path] [wand args] | --watch [path] | --enable-autopatch [path] | --disable-autopatch", "WandEnhancer Auto-Patch");
                 return;
             }
 

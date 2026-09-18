@@ -61,25 +61,24 @@ jobs:
           git fetch upstream
           git merge upstream/master -X ours --no-edit --allow-unrelated-histories || echo "Merge had conflicts; building with current source."
 
-          if git diff --quiet "$pre_merge" HEAD -- src/; then
+          if git diff --quiet "$pre_merge" HEAD -- WandEnhancer WandEnhancer.Core AsarSharp web-panel; then
             echo "src_changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "src_changed=true" >> "$GITHUB_OUTPUT"
           fi
         shell: bash
 
-      # Upstream 2.x moved its source tree to the repository root while this fork builds
-      # src/, so a detected upstream release often cannot change anything we compile.
-      # That is reported, not fatal: releases are versioned from this fork's own assembly
-      # version, so an inapplicable upstream tag can no longer masquerade as our release.
-      # Re-basing onto upstream's layout is a separate, human-reviewed change.
+      # Upstream 2.x replaced the signature/regex engine with structural locators, and
+      # this fork now builds upstream's own tree at the repository root, so a detected
+      # upstream release applies directly instead of being reported as inapplicable.
+      # Releases are still versioned from this fork's own assembly version.
       - name: Report upstream sync applicability
         if: needs.check-upstream.outputs.new_version == 'true'
         run: |
           if [ "${{ steps.sync.outputs.src_changed }}" = "true" ]; then
-            echo "Upstream ${{ needs.check-upstream.outputs.upstream_tag }} changed src/; the build below includes it."
+            echo "Upstream ${{ needs.check-upstream.outputs.upstream_tag }} changed the build tree; the build below includes it."
           else
-            echo "::notice::Upstream ${{ needs.check-upstream.outputs.upstream_tag }} was detected but does not apply to src/. Building this fork's current sources; the release is versioned from this fork's own version, not the upstream tag."
+            echo "::notice::Upstream ${{ needs.check-upstream.outputs.upstream_tag }} was detected but does not apply to the build tree. Building this fork's current sources; the release is versioned from this fork's own version, not the upstream tag."
           fi
         shell: bash
 
@@ -100,27 +99,16 @@ jobs:
       - name: Setup NuGet
         uses: nuget/setup-nuget@v4
 
-      - name: Setup CMake
-        uses: lukka/get-cmake@latest
-
-      - name: Build native proxy DLL
-        working-directory: src
-        run: |
-          cmake -S tools/asar-fuses-bypass -B .tmp/cmake/asar-fuses-bypass -A x64
-          cmake --build .tmp/cmake/asar-fuses-bypass --config Release
-
       - name: Build web panel
-        working-directory: src/web-panel
+        working-directory: web-panel
         run: |
           pnpm install --frozen-lockfile
           pnpm build
 
       - name: Restore NuGet packages
-        working-directory: src
         run: nuget restore Wand-Enhancer.sln
 
       - name: Build solution
-        working-directory: src
         run: msbuild Wand-Enhancer.sln /p:Configuration=Release /p:Platform="Any CPU" /v:minimal
 
       - name: Determine version
@@ -129,7 +117,7 @@ jobs:
           # Always this fork's own version. Adopting the upstream tag would advertise
           # code we do not build, and would make the release look up-to-date to the
           # updater forever (it compares this tag against the upstream tag).
-          $dll = "src\WandEnhancer\bin\Release\WandEnhancer.exe"
+          $dll = "WandEnhancer\bin\Release\WandEnhancer.exe"
           $ver = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($dll).FileVersion
           echo "tag=v$ver" >> $env:GITHUB_OUTPUT
         shell: pwsh
@@ -144,7 +132,7 @@ jobs:
           # Strip the leading "v" from the tag (GitHub tags are "v1.0.9.4") so the
           # version shown in Add/Remove Programs is plain "1.0.9.4".
           $appVersion = "${{ steps.version.outputs.tag }}" -replace '^v',''
-          & $iscc "/DMyAppVersion=$appVersion" src\installer\WandEnhancer.iss
+          & $iscc "/DMyAppVersion=$appVersion" installer\WandEnhancer.iss
         shell: pwsh
 
       # Signs when SIGNING_CERT_PFX_BASE64 and SIGNING_CERT_PASSWORD repo secrets
@@ -164,9 +152,9 @@ jobs:
           }
           $pfx = Join-Path $env:RUNNER_TEMP 'signing.pfx'
           [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT_PFX_BASE64))
-          & src\scripts\sign-artifacts.ps1 -Files @(
-            'src\WandEnhancer\bin\Release\WandEnhancer.exe',
-            'src\WandEnhancer\bin\Release\AutoPatch\WandEnhancer.AutoPatch.exe',
+          & scripts\sign-artifacts.ps1 -Files @(
+            'WandEnhancer\bin\Release\WandEnhancer.exe',
+            'WandEnhancer.AutoPatch\bin\Release\WandEnhancer.AutoPatch.exe',
             'dist\WandEnhancerSetup.exe'
           ) -PfxPath $pfx -PfxPassword $env:CERT_PASSWORD
           Remove-Item $pfx -Force

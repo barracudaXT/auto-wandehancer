@@ -54,6 +54,7 @@
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="AutoPatchArguments.cs" />
+    <Compile Include="AutoPatchSetup.cs" />
     <Compile Include="LaunchModeController.cs" />
     <Compile Include="PatchModeController.cs" />
     <Compile Include="Program.cs" />

@@ -21,6 +21,12 @@
                     case "--watch":
                         result.Mode = "watch";
                         break;
+                    case "--enable-autopatch":
+                        result.Mode = "enable-autopatch";
+                        break;
+                    case "--disable-autopatch":
+                        result.Mode = "disable-autopatch";
+                        break;
                     default:
                         if (!args[i].StartsWith("--") && string.IsNullOrEmpty(result.WeModPath))
                         {

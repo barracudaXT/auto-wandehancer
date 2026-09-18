@@ -1,6 +1,6 @@
 <div align="center">
 
-![logo](src/assets/icon.svg)
+![logo](assets/icon.svg)
 
 # WandEnhancer (Auto-Build Fork)
 
@@ -18,12 +18,10 @@ This fork of [Wand-Enhancer](https://github.com/k1tbyte/Wand-Enhancer) adds:
 
 All upstream features (patching, auto-patch watcher, remote web panel, custom scripts) work the same as in the original project.
 
-> **Upstream version.** This fork is based on upstream **1.0.9.4**. Upstream **2.0.0.0** was a
-> rewrite — a structural patch engine, a launcher that replaces the Squirrel stub, and its own
-> update notifier — and it moved the source tree to the repository root. The mirror workflow
-> builds `src/`, so upstream 2.x changes never reach a build here. Until the fork is re-based
-> onto the 2.x layout, releases stay on the 1.0.9.4 line, and the workflow now **fails loudly**
-> rather than publishing an unchanged build under a new upstream tag.
+> **Upstream version.** This fork builds upstream **2.1.0.0** directly, from
+> upstream's own sources at the repository root, and adds the pre-built installer, the
+> auto-patch watcher, the updater with download verification, and code signing.
+
 
 ## Installation
 
@@ -79,24 +77,25 @@ The auto-patch system runs as a lightweight tray application with three modes:
 ### Requirements
 
 - Windows 10/11
-- Visual Studio 2022 or Build Tools for Visual Studio 2022 with MSBuild and the C++ workload
+- Visual Studio 2019 or later with MSBuild, or Build Tools for Visual Studio
 - .NET Framework 4.8 targeting pack
-- CMake
-- Node.js and pnpm
+- Node.js 22.19 or later and pnpm
 - Inno Setup 6
 
 ### Build
 
 ```
-cd src
 .\build.ps1
 ```
 
-The output installer is written to `dist\WandEnhancerSetup.exe`.
+Runs the web panel build, restores and builds the solution, runs the patch-locator
+and fork test suites, and packages `dist\WandEnhancerSetup.exe`. Add
+`-SignPfxPath <certificate.pfx> -SignPfxPassword <password>` to Authenticode-sign
+the artifacts.
 
 ## License
 
-Apache-2.0 — see [LICENSE](src/LICENSE.md).
+Apache-2.0 — see [LICENSE](LICENSE.md).
 
 ---
 
