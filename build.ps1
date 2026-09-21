@@ -70,6 +70,41 @@ function Resolve-TargetFrameworkRoot {
     return $null
 }
 
+function Resolve-NuGetPath {
+    # Only needed when the NUnit console runner is missing from packages/.
+    $command = Get-Command 'nuget' -ErrorAction SilentlyContinue
+    if ($command) {
+        return $command.Source
+    }
+
+    $candidates = @(
+        (Join-Path $repoRoot '.nuget\nuget.exe'),
+        (Join-Path $env:LOCALAPPDATA 'NuGet\nuget.exe')
+    )
+    foreach ($candidate in $candidates) {
+        if (Test-Path $candidate) {
+            return $candidate
+        }
+    }
+
+    throw 'nuget.exe not found in PATH, .nuget\, or %LOCALAPPDATA%\NuGet. Install it to restore the test runner.'
+}
+
+function Resolve-InnoSetupPath {
+    $candidates = @(
+        (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'),
+        (Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe')
+    )
+    foreach ($candidate in $candidates) {
+        if (Test-Path $candidate) {
+            return $candidate
+        }
+    }
+
+    throw 'ISCC.exe not found. Install Inno Setup 6, or pass the installer through CI.'
+}
+
 $pnpm = Resolve-CommandPath 'pnpm'
 $visualStudio = Resolve-VisualStudioPath
 $msbuild = Resolve-MSBuildPath $visualStudio

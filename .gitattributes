@@ -11,6 +11,18 @@
 *.json text eol=crlf
 *.resx text eol=crlf
 
+# Web panel sources are LF. Without these the formatter step in `pnpm run lint`
+# reports every CRLF line as an error on a Windows checkout, so `build.ps1`
+# aborts at the lint step before it builds anything.
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.mjs text eol=lf
+*.cjs text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.po text eol=lf
+
 # Markdown uses LF (cross-platform convention).
 *.md text eol=lf
 

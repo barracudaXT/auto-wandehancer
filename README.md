@@ -89,9 +89,12 @@ The auto-patch system runs as a lightweight tray application with three modes:
 ```
 
 Runs the web panel build, restores and builds the solution, runs the patch-locator
-and fork test suites, and packages `dist\WandEnhancerSetup.exe`. Add
-`-SignPfxPath <certificate.pfx> -SignPfxPassword <password>` to Authenticode-sign
-the artifacts.
+and fork test suites, and packages `dist\WandEnhancerSetup.exe`.
+
+Authenticode signing is performed by the release workflow
+(`.github/workflows/build-release.yml`), which signs the executables before the
+installer is built and then signs the installer itself. Locally, sign artifacts
+with `scripts/sign-artifacts.ps1`.
 
 ## License
 
