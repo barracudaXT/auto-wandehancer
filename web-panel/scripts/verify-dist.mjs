@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Enforces the dist invariants AGENTS.md previously only stated in prose:
+// Enforces the dist invariants the build notes previously only stated in prose:
 // the bundles must parse, and no dev-only payload may ship to users.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
