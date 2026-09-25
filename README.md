@@ -73,7 +73,7 @@ The auto-patch system runs as a lightweight tray application with three modes:
 
 ### Disabling
 
-- **Via the installer:** Apps → Installed apps → WandEnhancer → Uninstall.
+- **Via the installer:** Apps → Installed apps → **auto-wandenhancer** → Uninstall.
 - **Via the app:** Open Auto-patch setup (shield icon) → Disable.
 
 ## Building from Source

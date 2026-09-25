@@ -2,7 +2,14 @@
 ; Build from the repository root with:
 ;   iscc installer\WandEnhancer.iss /DOutputDir=WandEnhancer\bin\Release
 
-#define MyAppName "WandEnhancer"
+; Product name shown to users (Add/Remove Programs, Start Menu, wizard). The
+; installed executable is still WandEnhancer.exe -- that is the app being
+; distributed, and this project is the distribution of it.
+#define MyAppName "auto-wandenhancer"
+; AppId is deliberately unchanged. A new AppId would install alongside the old
+; product instead of upgrading it, and the orphaned uninstaller would then run
+; --disable-autopatch, killing the new watcher and deleting the scheduled task
+; that both installs share.
 ; Keep in step with the AssemblyVersion in the projects under ..\ (WandEnhancer,
 ; WandEnhancer.AutoPatch). CI overrides this with /DMyAppVersion=<release tag>
 ; so released installers always carry the real version.
