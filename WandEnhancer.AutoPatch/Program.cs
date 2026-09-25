@@ -16,6 +16,40 @@ namespace WandEnhancer.AutoPatch
         [STAThread]
         static void Main(string[] args)
         {
+            try
+            {
+                Run(args);
+            }
+            catch (Exception ex)
+            {
+                // A missing dependency used to kill the process during assembly load,
+                // before any logging existed, so auto-patch just silently never ran.
+                // Record it somewhere the user can actually find.
+                CrashLog(ex);
+                Environment.Exit(1);
+            }
+        }
+
+        private static void CrashLog(Exception ex)
+        {
+            try
+            {
+                var logDirectory = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "WandEnhancer", "logs");
+                Directory.CreateDirectory(logDirectory);
+                File.AppendAllText(
+                    Path.Combine(logDirectory, "crash.log"),
+                    $"{DateTime.Now:O} WandEnhancer.AutoPatch failed to start: {ex}{Environment.NewLine}");
+            }
+            catch
+            {
+                // Nothing left to fall back on.
+            }
+        }
+
+        private static void Run(string[] args)
+        {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 

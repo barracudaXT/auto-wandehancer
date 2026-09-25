@@ -50,6 +50,10 @@ Source: "..\WandEnhancer.AutoPatch\bin\Release\WandEnhancer.AutoPatch.exe"; Dest
 Source: "..\WandEnhancer.AutoPatch\bin\Release\WandEnhancer.Core.dll"; DestDir: "{app}\AutoPatch"; Flags: ignoreversion
 Source: "..\WandEnhancer.AutoPatch\bin\Release\Newtonsoft.Json.dll"; DestDir: "{app}\AutoPatch"; Flags: ignoreversion
 Source: "..\WandEnhancer.AutoPatch\bin\Release\AsarSharp.dll"; DestDir: "{app}\AutoPatch"; Flags: ignoreversion
+; The watcher has a ProjectReference to the app project, so its assembly carries a
+; hard reference to WandEnhancer 2.x. Without this file present the watcher cannot
+; load at all and auto-patch silently never runs.
+Source: "{#OutputDir}\WandEnhancer.exe"; DestDir: "{app}\AutoPatch"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
