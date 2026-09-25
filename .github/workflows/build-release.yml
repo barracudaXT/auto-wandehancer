@@ -213,13 +213,24 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: WandEnhancer ${{ steps.version.outputs.tag }}
+          # Named for THIS project. The tag stays v<version> because the updater
+          # parses it with Version.TryParse after trimming a leading v, so a
+          # prefixed tag would not parse and would silently stop updates.
+          name: auto-wandehancer ${{ steps.version.outputs.tag }}
           body: |
-            Automated build of this fork, from its own sources.
+            Auto-built **auto-wandenhancer** — the pre-built, self-updating fork of
+            Wand-Enhancer. Download `WandEnhancerSetup.exe` and run it; it detects
+            your Wand/WeMod folder and keeps itself patched from then on.
+
+            ### About this version
+            This release tracks upstream's version number, so
+            `${{ steps.version.outputs.tag }}` is upstream's version and not a
+            separate fork version. The build is this fork's own sources at
+            `${{ github.sha }}`.
 
             ### Changes
-            This build reports its own version. For upstream release notes, see
-            [upstream releases](https://github.com/k1tbyte/Wand-Enhancer/releases).
+            Upstream release notes: [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md)
+            · [upstream releases](https://github.com/k1tbyte/Wand-Enhancer/releases)
           files: dist/WandEnhancerSetup.exe
           draft: false
           prerelease: false
