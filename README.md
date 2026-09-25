@@ -2,7 +2,7 @@
 
 ![logo](assets/icon.svg)
 
-# WandEnhancer (Auto-Build Fork)
+# auto-wandenhancer
 
 Pre-built installer with automatic updates — no manual Actions workflow needed.
 
@@ -10,18 +10,22 @@ Pre-built installer with automatic updates — no manual Actions workflow needed
 
 ## What is this?
 
-This fork of [Wand-Enhancer](https://github.com/k1tbyte/Wand-Enhancer) adds:
+**auto-wandenhancer** is a pre-built, self-updating distribution of
+[WandEnhancer](https://github.com/k1tbyte/Wand-Enhancer). Upstream publishes no
+executables — you fork it and run its build workflow yourself. This project does
+that part for you:
 
-- **Pre-built installer** — download `WandEnhancerSetup.exe` directly from [Releases](https://github.com/barracudaXT/auto-wandehancer/releases/latest) instead of running GitHub Actions yourself.
+- **Pre-built installer** — download `WandEnhancerSetup.exe` directly from [Releases](https://github.com/barracudaXT/auto-wandehancer/releases/latest) instead of building it yourself.
 - **Automatic updates** — the tray watcher checks for new releases every 6 hours and offers one-click silent updates.
-- **Automated CI/CD** — a GitHub Actions workflow polls the upstream repo every 6 hours, syncs changes, builds the installer, and publishes a new release automatically.
+- **Automated builds** — a scheduled workflow checks upstream every 6 hours, merges it with this repository's files winning, builds the installer, and publishes a release.
 
-All upstream features (patching, auto-patch watcher, remote web panel, custom scripts) work the same as in the original project.
+Everything upstream does — patching, the auto-patch watcher, the remote web
+panel, custom scripts — is included unchanged.
 
-> **Upstream version.** This fork builds upstream **2.1.0.0** directly, from
-> upstream's own sources at the repository root, and adds the pre-built installer, the
-> auto-patch watcher, the updater with download verification, and code signing.
-
+> **Versioning.** This project tracks upstream's version number, so release
+> `v2.1.0.0` is *upstream's* version, not a separate auto-wandenhancer version.
+> The build is this repository's own sources; each release names the commit it
+> was built from.
 
 ## Installation
 
