@@ -171,7 +171,7 @@ if (Test-Path $forkTestDll) {
 $iscc = Resolve-InnoSetupPath
 Invoke-Step 'Build installer' {
     $installerScript = Join-Path $repoRoot 'installer\WandEnhancer.iss'
-    $appVersion = (Get-Content (Join-Path $repoRoot 'WandEnhancer\Properties\AssemblyInfo.cs') |
+    $appVersion = (Get-Content (Join-Path $repoRoot 'BuildVersion.cs') |
         Select-String -Pattern 'AssemblyFileVersion\("([\d.]+)"\)' |
         ForEach-Object { $_.Matches[0].Groups[1].Value } | Select-Object -First 1)
     if ([string]::IsNullOrWhiteSpace($appVersion)) { $appVersion = '1.0.0' }
