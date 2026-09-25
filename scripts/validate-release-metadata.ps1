@@ -6,7 +6,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$assemblyInfoPath = Join-Path $repoRoot 'WandEnhancer\Properties\AssemblyInfo.cs'
+$assemblyInfoPath = Join-Path $repoRoot 'BuildVersion.cs'
 $changelogPath = Join-Path $repoRoot 'CHANGELOG.md'
 
 function Normalize-Version {
@@ -55,7 +55,7 @@ function Get-ChangelogSection {
 }
 
 if (-not (Test-Path $assemblyInfoPath)) {
-    throw "AssemblyInfo.cs not found: $assemblyInfoPath"
+    throw "BuildVersion.cs not found: $assemblyInfoPath"
 }
 
 if (-not (Test-Path $changelogPath)) {
@@ -69,11 +69,11 @@ $assemblyVersionMatch = [regex]::Match($assemblyInfoContent, '(?m)^\s*\[assembly
 $fileVersionMatch = [regex]::Match($assemblyInfoContent, '(?m)^\s*\[assembly:\s*AssemblyFileVersion\("(?<version>[^"]+)"\)\]')
 
 if (-not $assemblyVersionMatch.Success) {
-    throw 'AssemblyVersion was not found in AssemblyInfo.cs.'
+    throw 'AssemblyVersion was not found in BuildVersion.cs.'
 }
 
 if (-not $fileVersionMatch.Success) {
-    throw 'AssemblyFileVersion was not found in AssemblyInfo.cs.'
+    throw 'AssemblyFileVersion was not found in BuildVersion.cs.'
 }
 
 $assemblyVersion = Normalize-Version $assemblyVersionMatch.Groups['version'].Value
@@ -90,7 +90,7 @@ if ($changelogVersionMatches.Count -eq 0) {
 
 $latestChangelogVersion = Normalize-Version $changelogVersionMatches[0].Groups['version'].Value
 if ($latestChangelogVersion -ne $assemblyVersion) {
-    throw "The first CHANGELOG.md section ($latestChangelogVersion) must match AssemblyInfo.cs version ($assemblyVersion)."
+    throw "The first CHANGELOG.md section ($latestChangelogVersion) must match BuildVersion.cs version ($assemblyVersion)."
 }
 
 $latestSection = Get-ChangelogSection -Content $changelogContent -TargetVersion $assemblyVersion
@@ -101,13 +101,50 @@ if ([string]::IsNullOrWhiteSpace($latestSection)) {
 if (-not [string]::IsNullOrWhiteSpace($ExpectedVersion)) {
     $normalizedExpectedVersion = Normalize-Version $ExpectedVersion
     if ($normalizedExpectedVersion -ne $assemblyVersion) {
-        throw "Release tag version ($normalizedExpectedVersion) must match AssemblyInfo.cs version ($assemblyVersion)."
+        throw "Release tag version ($normalizedExpectedVersion) must match BuildVersion.cs version ($assemblyVersion)."
     }
 
     $expectedSection = Get-ChangelogSection -Content $changelogContent -TargetVersion $normalizedExpectedVersion
     if ([string]::IsNullOrWhiteSpace($expectedSection)) {
         throw "CHANGELOG.md section '$normalizedExpectedVersion' is missing or empty."
     }
+}
+
+# The version source is only real if both product projects compile it, and only
+# single if neither AssemblyInfo still declares its own. A missing link leaves an
+# assembly at 0.0.0.0; a surviving attribute is a CS0579 build failure or, worse,
+# a second source of truth. Neither is detectable from the text alone.
+foreach ($project in @('WandEnhancer\WandEnhancer.csproj', 'WandEnhancer.AutoPatch\WandEnhancer.AutoPatch.csproj')) {
+    $projectPath = Join-Path $repoRoot $project
+    if (-not (Test-Path $projectPath)) { throw "Project not found: $projectPath" }
+    $projectContent = Get-Content -Path $projectPath -Raw
+    if ($projectContent -notmatch 'Compile\s+Include="\.\.\\BuildVersion\.cs"') {
+        throw "$project does not compile ..\BuildVersion.cs, so that assembly would ship version 0.0.0.0."
+    }
+}
+
+foreach ($info in @('WandEnhancer\Properties\AssemblyInfo.cs', 'WandEnhancer.AutoPatch\Properties\AssemblyInfo.cs')) {
+    $infoPath = Join-Path $repoRoot $info
+    if (-not (Test-Path $infoPath)) { throw "AssemblyInfo not found: $infoPath" }
+    $infoContent = Get-Content -Path $infoPath -Raw
+    if ($infoContent -match '(?m)^\s*\[assembly:\s*Assembly(File)?Version\(') {
+        throw "$info still declares a version attribute; the product version has two sources."
+    }
+}
+
+# The installer fallback is a packaged literal. Updating it once does not stop it
+# drifting again, so require it to equal the shared version. CI passes
+# /DMyAppVersion and overrides it, but a hand-run iscc must not stamp a stale value.
+$installerPath = Join-Path $repoRoot 'installer\WandEnhancer.iss'
+if (-not (Test-Path $installerPath)) { throw "Installer script not found: $installerPath" }
+$installerContent = Get-Content -Path $installerPath -Raw
+$fallbackMatch = [regex]::Match($installerContent, '(?m)^\s*#define\s+MyAppVersion\s+"(?<version>[^"]+)"')
+if (-not $fallbackMatch.Success) {
+    throw 'installer/WandEnhancer.iss has no MyAppVersion fallback to validate.'
+}
+$fallbackVersion = Normalize-Version $fallbackMatch.Groups['version'].Value
+if ($fallbackVersion -ne $assemblyVersion) {
+    throw "Installer fallback ($fallbackVersion) must match the shared product version ($assemblyVersion)."
 }
 
 Write-Host "Validated release metadata for version $assemblyVersion"

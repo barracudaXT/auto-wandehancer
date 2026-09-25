@@ -122,6 +122,10 @@ jobs:
           echo "tag=v$ver" >> $env:GITHUB_OUTPUT
         shell: pwsh
 
+      - name: Validate release metadata
+        shell: pwsh
+        run: .\scripts\validate-release-metadata.ps1 -ExpectedVersion '${{ steps.version.outputs.tag }}'
+
       # Signs when SIGNING_CERT_PFX_BASE64 and SIGNING_CERT_PASSWORD repo secrets
       # are set; otherwise the step no-ops and the release stays unsigned.
       # A CA-issued certificate is required for this to clear SmartScreen.
