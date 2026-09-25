@@ -58,7 +58,10 @@ namespace WandEnhancer.AutoPatch
                     var psi = new ProcessStartInfo
                     {
                         FileName = installerPath,
-                        Arguments = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS",
+                        // MERGETASKS is required: a silent install shows no Tasks page, so
+                        // without it the [Run] "enable auto-patch" entry is skipped and the
+                        // watcher is never re-created after an update.
+                        Arguments = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /MERGETASKS=autopatch",
                         UseShellExecute = true,
                         Verb = "runas"
                     };

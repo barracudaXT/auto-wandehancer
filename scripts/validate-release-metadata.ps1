@@ -158,3 +158,22 @@ if ($fallbackVersion -ne $assemblyVersion) {
 }
 
 Write-Host "Validated release metadata for version $assemblyVersion"
+
+# The watcher and the installer's enable step must stay wired to each other.
+# Two shipped releases failed silently here: the watcher died at assembly load
+# because the installer never deployed the WandEnhancer assembly it binds to, and
+# a silent install skips [Run] entirely unless MERGETASKS names the task -- so the
+# updater's own arguments left auto-patch permanently disabled after an update.
+if (Select-String -Path 'WandEnhancer.AutoPatch/WandEnhancer.AutoPatch.csproj' `
+        -SimpleMatch 'WandEnhancer\WandEnhancer.csproj' -Quiet) {
+    # The watcher binds WandEnhancer at load time; the installer must ship that file
+    # into the same directory or the process dies before it can log anything.
+    if (-not (Select-String -Path $installerPath -SimpleMatch 'WandEnhancer.exe"; DestDir: "{app}\AutoPatch"' -Quiet)) {
+        throw 'WandEnhancer.AutoPatch references the app project, so the installer must deploy WandEnhancer.exe into {app}\AutoPatch.'
+    }
+
+    $updaterArgs = Select-String -Path 'WandEnhancer.AutoPatch/UpdateInstaller.cs' -Pattern 'Arguments\s+=' | Select-Object -First 1
+    if (-not $updaterArgs -or $updaterArgs.Line -notmatch '/MERGETASKS=autopatch') {
+        throw 'The updater must pass /MERGETASKS=autopatch, or a silent install skips auto-patch setup.'
+    }
+}
