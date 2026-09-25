@@ -99,17 +99,50 @@ jobs:
       - name: Setup NuGet
         uses: nuget/setup-nuget@v4
 
+      # Installed as its own step so every later web-panel step (lint, test) and
+      # scripts/test-patch-locators.ps1, which resolves esbuild from
+      # web-panel\node_modules, run against a populated tree on a clean runner.
+      - name: Install web panel dependencies
+        working-directory: web-panel
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint web panel
+        working-directory: web-panel
+        run: pnpm lint
+
       - name: Build web panel
         working-directory: web-panel
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm build
+        run: pnpm build
+
+      - name: Test web panel
+        working-directory: web-panel
+        run: pnpm test
 
       - name: Restore NuGet packages
         run: nuget restore Wand-Enhancer.sln
 
       - name: Build solution
         run: msbuild Wand-Enhancer.sln /p:Configuration=Release /p:Platform="Any CPU" /v:minimal
+
+      - name: Test desktop patch state and interop
+        shell: pwsh
+        run: .\scripts\test-desktop.ps1 -AssemblyPath .\WandEnhancer\bin\Release\WandEnhancer.exe
+
+      - name: Test structural patch locators
+        shell: pwsh
+        run: .\scripts\test-patch-locators.ps1 -AssemblyPath .\WandEnhancer\bin\Release\WandEnhancer.exe
+
+      - name: Test fork suite
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (-not (Test-Path $vswhere)) { throw "vswhere.exe not found: $vswhere" }
+          $vstest = & $vswhere -latest -products '*' -find '**\vstest.console.exe' | Select-Object -First 1
+          if ([string]::IsNullOrWhiteSpace($vstest)) { throw 'vstest.console.exe was not found.' }
+          & $vstest `
+            '.\WandEnhancer.Core.Tests\bin\Release\WandEnhancer.Core.Tests.dll' `
+            '/TestAdapterPath:.\packages\NUnit3TestAdapter.4.6.0\build\net462'
+          if ($LASTEXITCODE -ne 0) { throw 'Fork test suite failed.' }
 
       - name: Determine version
         id: version
