@@ -15,29 +15,39 @@ jobs:
       new_version: ${{ steps.check.outputs.new_version }}
       upstream_tag: ${{ steps.check.outputs.upstream_tag }}
     steps:
-      - name: Check upstream for new releases
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Runs before the check that depends on it: a broken gate now fails CI
+      # loudly instead of silently republishing or silently never publishing.
+      - name: Test version gate
+        run: bash scripts/test-upstream-version-gate.sh
+
+      - name: Check upstream for a newer release
         id: check
         run: |
           UPSTREAM_TAG=$(curl -s https://api.github.com/repos/k1tbyte/Wand-Enhancer/releases/latest \
             | jq -r '.tag_name // empty')
-          if [ -z "$UPSTREAM_TAG" ]; then
-            echo "No upstream release found."
-            echo "new_version=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
 
           OUR_TAG=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest \
             | jq -r '.tag_name // empty')
 
-          echo "Upstream: $UPSTREAM_TAG, Ours: $OUR_TAG"
+          echo "Upstream: ${UPSTREAM_TAG:-none}, Ours: ${OUR_TAG:-none}"
 
-          if [ "$UPSTREAM_TAG" = "$OUR_TAG" ]; then
-            echo "Already up to date."
-            echo "new_version=false" >> "$GITHUB_OUTPUT"
-          else
+          # Version-aware compare, NOT a string compare: upstream tags plain
+          # ("2.1.0.0") and this fork tags with a leading v ("v2.1.0.0"), so
+          # "$UPSTREAM_TAG" = "$OUR_TAG" was never true and the 6-hourly schedule
+          # reported a new upstream version on every single run -- republishing
+          # the same release four times a day. See scripts/upstream-version-gate.sh
+          # and its check, scripts/test-upstream-version-gate.sh.
+          NEW_VERSION=$(bash scripts/upstream-version-gate.sh "$UPSTREAM_TAG" "$OUR_TAG")
+          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "upstream_tag=$UPSTREAM_TAG" >> "$GITHUB_OUTPUT"
+
+          if [ "$NEW_VERSION" = "true" ]; then
             echo "New upstream version detected: $UPSTREAM_TAG"
-            echo "new_version=true" >> "$GITHUB_OUTPUT"
-            echo "upstream_tag=$UPSTREAM_TAG" >> "$GITHUB_OUTPUT"
+          else
+            echo "Already up to date; nothing to publish."
           fi
 
   build:
@@ -147,9 +157,14 @@ jobs:
       - name: Determine version
         id: version
         run: |
-          # Always this fork's own version. Adopting the upstream tag would advertise
-          # code we do not build, and would make the release look up-to-date to the
-          # updater forever (it compares this tag against the upstream tag).
+          # Version the release from this fork's own assembly, not from the
+          # upstream tag. These releases currently mirror upstream's numbering,
+          # so this yields v2.1.0.0 while upstream tags 2.1.0.0 -- the version
+          # gate normalises the leading v and treats the pair as equal.
+          # NOTE: the gate compares versions, which only answers "is upstream
+          # ahead?" while both lines share one numbering. If this fork ever
+          # versions independently, the gate must stop comparing versions and
+          # start tracking which upstream tag has been consumed.
           $dll = "WandEnhancer\bin\Release\WandEnhancer.exe"
           $ver = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($dll).FileVersion
           echo "tag=v$ver" >> $env:GITHUB_OUTPUT
@@ -192,8 +207,8 @@ jobs:
             choco install innosetup -y --no-progress
             $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           }
-          # Strip the leading "v" from the tag (GitHub tags are "v1.0.9.4") so the
-          # version shown in Add/Remove Programs is plain "1.0.9.4".
+          # Strip the leading "v" (tags carry one) so the version shown in
+          # Add/Remove Programs is plain "2.1.0.0".
           $appVersion = "${{ steps.version.outputs.tag }}" -replace '^v',''
           & $iscc "/DMyAppVersion=$appVersion" installer\WandEnhancer.iss
         shell: pwsh
