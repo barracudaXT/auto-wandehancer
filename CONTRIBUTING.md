@@ -85,7 +85,7 @@ Suggestions for new features or improvements are welcome! Create an Issue descri
 
 ## Release Process
 
-1. Update `WandEnhancer/Properties/AssemblyInfo.cs`.
+1. Update `BuildVersion.cs`.
 2. Add a new top section with the same version to `CHANGELOG.md`.
 3. Configure local hooks once:
    ```

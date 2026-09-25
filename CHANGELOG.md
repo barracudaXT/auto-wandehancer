@@ -1,7 +1,7 @@
 # Changelog
 
 This file is the source of truth for release notes.
-The newest entry must match the version in `WandEnhancer/Properties/AssemblyInfo.cs`.
+The newest entry must match the version in `BuildVersion.cs`.
 
 ## [2.1.0.0] - 2026-09-09
 
