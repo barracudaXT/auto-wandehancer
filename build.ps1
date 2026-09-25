@@ -174,7 +174,11 @@ Invoke-Step 'Build installer' {
     $appVersion = (Get-Content (Join-Path $repoRoot 'BuildVersion.cs') |
         Select-String -Pattern 'AssemblyFileVersion\("([\d.]+)"\)' |
         ForEach-Object { $_.Matches[0].Groups[1].Value } | Select-Object -First 1)
-    if ([string]::IsNullOrWhiteSpace($appVersion)) { $appVersion = '1.0.0' }
+    # Fail closed. A silent fallback here stamps the installer with a version that
+    # matches no release, and the build still reports success.
+    if ([string]::IsNullOrWhiteSpace($appVersion)) {
+        throw "Could not read AssemblyFileVersion from BuildVersion.cs; refusing to stamp the installer with a non-version."
+    }
     & $iscc "/DOutputDir=$(Join-Path $repoRoot "WandEnhancer\bin\$Configuration")" "/DMyAppVersion=$appVersion" $installerScript
 }
 
