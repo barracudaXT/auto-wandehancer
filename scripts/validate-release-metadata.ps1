@@ -164,16 +164,38 @@ Write-Host "Validated release metadata for version $assemblyVersion"
 # because the installer never deployed the WandEnhancer assembly it binds to, and
 # a silent install skips [Run] entirely unless MERGETASKS names the task -- so the
 # updater's own arguments left auto-patch permanently disabled after an update.
-if (Select-String -Path 'WandEnhancer.AutoPatch/WandEnhancer.AutoPatch.csproj' `
-        -SimpleMatch 'WandEnhancer\WandEnhancer.csproj' -Quiet) {
-    # The watcher binds WandEnhancer at load time; the installer must ship that file
-    # into the same directory or the process dies before it can log anything.
-    if (-not (Select-String -Path $installerPath -SimpleMatch 'WandEnhancer.exe"; DestDir: "{app}\AutoPatch"' -Quiet)) {
-        throw 'WandEnhancer.AutoPatch references the app project, so the installer must deploy WandEnhancer.exe into {app}\AutoPatch.'
-    }
+$watcherProjectPath = Join-Path $repoRoot 'WandEnhancer.AutoPatch\WandEnhancer.AutoPatch.csproj'
+$updaterPath = Join-Path $repoRoot 'WandEnhancer.AutoPatch\UpdateInstaller.cs'
 
-    $updaterArgs = Select-String -Path 'WandEnhancer.AutoPatch/UpdateInstaller.cs' -Pattern 'Arguments\s+=' | Select-Object -First 1
-    if (-not $updaterArgs -or $updaterArgs.Line -notmatch '/MERGETASKS=autopatch') {
-        throw 'The updater must pass /MERGETASKS=autopatch, or a silent install skips auto-patch setup.'
+# The watcher binds WandEnhancer at load time. That dependency is transitive
+# (AutoPatch -> WandEnhancer.Core -> WandEnhancer), so test for it the way the CLR
+# does -- follow the ProjectReference chain -- rather than trusting one csproj.
+function Test-ReferencesAppProject {
+    param([string]$ProjectPath, [int]$Depth = 0)
+
+    $name = Split-Path -Leaf $ProjectPath
+    if ($name -eq 'WandEnhancer.csproj') { return $true }
+    if ($Depth -gt 4 -or -not (Test-Path $ProjectPath)) { return $false }
+
+    $content = Get-Content -Path $ProjectPath -Raw
+    foreach ($match in [regex]::Matches($content, '<ProjectReference\s+Include="(?<inc>[^"]+)"')) {
+        $sibling = Join-Path (Split-Path -Parent $ProjectPath) $match.Groups['inc'].Value
+        if (Test-ReferencesAppProject -ProjectPath $sibling -Depth ($Depth + 1)) { return $true }
     }
+    return $false
+}
+
+if (Test-ReferencesAppProject -ProjectPath $watcherProjectPath) {
+    # Without this file deployed beside the watcher, the CLR cannot resolve
+    # WandEnhancer and the process dies before it can log anything.
+    if (-not (Select-String -Path $installerPath -SimpleMatch 'WandEnhancer.exe"; DestDir: "{app}\AutoPatch"' -Quiet)) {
+        throw 'WandEnhancer.AutoPatch reaches the app project, so the installer must deploy WandEnhancer.exe into {app}\AutoPatch.'
+    }
+}
+
+# Independent of the reference above: a silent install skips [Run] unless MERGETASKS
+# names the task, so the updater must always pass it.
+$updaterArgs = Select-String -Path $updaterPath -Pattern 'Arguments\s+=' | Select-Object -First 1
+if (-not $updaterArgs -or $updaterArgs.Line -notmatch '/MERGETASKS=autopatch') {
+    throw 'The updater must pass /MERGETASKS=autopatch, or a silent install skips auto-patch setup.'
 }
