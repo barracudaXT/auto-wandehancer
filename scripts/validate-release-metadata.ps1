@@ -114,11 +114,21 @@ if (-not [string]::IsNullOrWhiteSpace($ExpectedVersion)) {
 # single if neither AssemblyInfo still declares its own. A missing link leaves an
 # assembly at 0.0.0.0; a surviving attribute is a CS0579 build failure or, worse,
 # a second source of truth. Neither is detectable from the text alone.
+#
+# Match the XML element itself, not the raw text: a commented-out or
+# documentation sample containing the same string still matches a plain
+# substring test, and that bypass was reproduced (validator passed while the
+# watcher silently built as 0.0.0.0).
 foreach ($project in @('WandEnhancer\WandEnhancer.csproj', 'WandEnhancer.AutoPatch\WandEnhancer.AutoPatch.csproj')) {
     $projectPath = Join-Path $repoRoot $project
     if (-not (Test-Path $projectPath)) { throw "Project not found: $projectPath" }
-    $projectContent = Get-Content -Path $projectPath -Raw
-    if ($projectContent -notmatch 'Compile\s+Include="\.\.\\BuildVersion\.cs"') {
+    $xml = New-Object System.Xml.XmlDocument
+    $xml.Load($projectPath)
+    $compiles = $xml.SelectNodes('//*[local-name()="Compile"]')
+    $linked = @($compiles | Where-Object {
+        $_.GetAttribute('Include').Replace('\', '/') -eq '../BuildVersion.cs'
+    })
+    if ($linked.Count -eq 0) {
         throw "$project does not compile ..\BuildVersion.cs, so that assembly would ship version 0.0.0.0."
     }
 }
