@@ -157,21 +157,32 @@ namespace WandEnhancer.AutoPatch
                         tray.ShowDownloading(0);
                         Task.Run(async () =>
                         {
-                            var progress = new Progress<int>(pct =>
+                            try
                             {
-                                if (pct < 0)
-                                    tray.ShowInstalling();
+                                var progress = new Progress<int>(pct =>
+                                {
+                                    if (pct < 0)
+                                        tray.ShowInstalling();
+                                    else
+                                        tray.ShowDownloading(pct);
+                                });
+                                var installed = await updateInstaller.DownloadAndInstallAsync(update, cts.Token, progress);
+                                if (installed)
+                                {
+                                    cts.Cancel();
+                                    Application.Exit();
+                                }
                                 else
-                                    tray.ShowDownloading(pct);
-                            });
-                            var installed = await updateInstaller.DownloadAndInstallAsync(update, cts.Token, progress);
-                            if (installed)
-                            {
-                                cts.Cancel();
-                                Application.Exit();
+                                {
+                                    tray.ShowUpdateAvailable(update.TagName);
+                                }
                             }
-                            else
+                            catch (Exception ex)
                             {
+                                // Unobserved-task delivery is nondeterministic and may never run before
+                                // exit, so log at the task boundary instead of relying on the global
+                                // handler. Otherwise an install failure leaves no trace anywhere.
+                                _logger.Error($"Update install failed: {ex}");
                                 tray.ShowUpdateAvailable(update.TagName);
                             }
                         });

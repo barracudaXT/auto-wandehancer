@@ -13,6 +13,23 @@ namespace WandEnhancer
     /// </summary>
     public partial class App
     {
+        public App()
+        {
+            // Without this, an exception on the WPF UI thread is an unhandled crash
+            // with nothing written to any log. Attached in the constructor so it is
+            // in place before any window or view model runs.
+            DispatcherUnhandledException += (sender, e) =>
+            {
+                Program.LogFatal(e.Exception);
+                System.Windows.MessageBox.Show(
+                    e.Exception?.Message ?? "Unknown error",
+                    Constants.RepoName,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                e.Handled = true;
+            };
+        }
+
         protected override void OnStartup(StartupEventArgs e)
         {
             LocalizationManager.Initialize();

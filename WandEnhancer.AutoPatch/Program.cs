@@ -16,6 +16,17 @@ namespace WandEnhancer.AutoPatch
         [STAThread]
         static void Main(string[] args)
         {
+            // The tray callbacks run their work on Task.Run threads. An exception
+            // there is unhandled, kills the watcher, and - before this - left no
+            // trace: the same silent-death shape as the undeployed-assembly bug.
+            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+                LogFatal(null, e.ExceptionObject as Exception);
+            TaskScheduler.UnobservedTaskException += (s, e) =>
+            {
+                e.SetObserved();
+                LogFatal(null, e.Exception.GetBaseException());
+            };
+
             try
             {
                 Run(args);
@@ -28,6 +39,42 @@ namespace WandEnhancer.AutoPatch
                 CrashLog(ex);
                 Environment.Exit(1);
             }
+        }
+
+        /// <summary>
+        /// Records a fatal exception. The logger is null for exceptions raised before
+        /// Run() has built one, so this falls back to the same crash.log CrashLog uses.
+        /// </summary>
+        internal static void LogFatal(ILogger logger, Exception error)
+        {
+            if (error == null)
+            {
+                return;
+            }
+
+            string line = $"FATAL {error.GetType().FullName}: {error.Message}{Environment.NewLine}{error}";
+            if (logger != null)
+            {
+                logger.Error(line);
+                return;
+            }
+
+            CrashLog(error);
+        }
+
+        /// <summary>
+        /// Maps the fork's richer ELogType onto ILogger's two levels. Error must not
+        /// collapse to Info, or a real failure reads as routine output.
+        /// </summary>
+        internal static void LogWithLevel(ILogger logger, string message, ELogType type)
+        {
+            if (type == ELogType.Error)
+            {
+                logger.Error(message);
+                return;
+            }
+
+            logger.Info(message);
         }
 
         private static void CrashLog(Exception ex)
@@ -71,7 +118,9 @@ namespace WandEnhancer.AutoPatch
                 return;
             }
 
-            var patchLogger = new Action<string, ELogType>((msg, type) => logger.Info(msg));
+            // Map to ILogger's two levels. Warn/Success collapse to Info, but Error
+            // must not: an error indistinguishable from routine output is not a log.
+            var patchLogger = new Action<string, ELogType>((msg, type) => LogWithLevel(logger, msg, type));
             var settingsStore = new SettingsStore(settingsPath);
             var locator = new WeModLocator(WandEnhancer.Core.Extensions.PathExtensions.CheckWeModPath, allowManualFallback: false);
             var processManager = new ProcessManager(logger);

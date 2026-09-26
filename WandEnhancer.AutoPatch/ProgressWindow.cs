@@ -95,7 +95,18 @@ namespace WandEnhancer.AutoPatch
             _openMainButton.Visible = false;
         });
 
-        public void SafeClose() => RunOnUI(() => base.Close());
+        public void SafeClose()
+        {
+            if (IsDisposed || !Visible)
+            {
+                // Closing a form that was never shown disposes it, and the caller's
+                // later ShowDialog() then throws ObjectDisposedException. Leave it to
+                // ShowDialog/the success timer to close once it is actually on screen.
+                return;
+            }
+
+            RunOnUI(() => base.Close());
+        }
 
         private void RunOnUI(Action action)
         {

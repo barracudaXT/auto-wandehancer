@@ -117,3 +117,16 @@ try {
 finally {
     Remove-Item -LiteralPath $scratch -Recurse -Force
 }
+
+# Logging must be reachable from the shipped assembly, not just the test harness.
+$launcherLog = $assembly.GetType('WandEnhancer.Core.LauncherLog', $true)
+$program = $assembly.GetType('WandEnhancer.Program', $true)
+$logFatal = $program.GetMethod('LogFatal', $privateStatic)
+Assert-Equal ($null -ne $logFatal) $true 'Fatal error logging entry point'
+$openMethod = $launcherLog.GetMethod('Open', [Reflection.BindingFlags]'Public, Static')
+Assert-Equal ($null -ne $openMethod) $true 'Launcher log open entry point'
+
+$autoPatch = [Reflection.Assembly]::LoadFrom((Resolve-Path 'WandEnhancer.AutoPatch/bin/Release/WandEnhancer.AutoPatch.exe').Path)
+$autoPatchProgram = $autoPatch.GetType('WandEnhancer.AutoPatch.Program', $true)
+$apLogFatal = $autoPatchProgram.GetMethod('LogFatal', [Reflection.BindingFlags]'NonPublic, Static')
+Assert-Equal ($null -ne $apLogFatal) $true 'Watcher fatal error logging entry point'

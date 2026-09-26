@@ -34,6 +34,7 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Windows.Forms" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\WandEnhancer.Core\WandEnhancer.Core.csproj" />
@@ -48,6 +49,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Fakes.cs" />
+    <Compile Include="LauncherLogTests.cs" />
     <Compile Include="UpdateDetectionTests.cs" />
     <Compile Include="UpdateIntegrityTests.cs" />
     <Compile Include="UpdateHandoffTests.cs" />

@@ -28,6 +28,13 @@ namespace WandEnhancer
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
             TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
+            // Opened for every mode. Previously only launch mode reached Open(),
+            // so UI-mode errors had nowhere to go: the install directory is not
+            // writable by a standard user, and the write failure was swallowed.
+            LauncherLog.Open(AppDomain.CurrentDomain.BaseDirectory,
+                $"WandEnhancer {Constants.Version} build {Constants.Build} | ui/launch entry | " +
+                $"{System.Reflection.Assembly.GetExecutingAssembly().Location}");
+
             if (TryLaunchMode(args))
                 return;
 
@@ -200,9 +207,27 @@ namespace WandEnhancer
             RecordStartupLog($"Background task failed: {e.Exception.GetBaseException().Message}", ELogType.Error);
         }
 
+        /// <summary>Records a fatal exception. Must run before the process exits.</summary>
+        internal static void LogFatal(Exception error)
+        {
+            if (error == null)
+            {
+                // A null ExceptionObject is legal (see UnhandledExceptionEventArgs docs).
+                LauncherLog.Write("Fatal error: no exception object was provided.", ELogType.Error);
+                return;
+            }
+
+            LauncherLog.Write(
+                $"FATAL {error.GetType().FullName}: {error.Message}{Environment.NewLine}{error}",
+                ELogType.Error);
+        }
+
         private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
             var error = e.ExceptionObject as Exception;
+            LogFatal(error);            // record first: nothing after Exit is written
+            LauncherLog.Write($"IsTerminating={e.IsTerminating}", ELogType.Error);
+
             MessageBox.Show(
                 error?.Message ?? e.ExceptionObject?.ToString() ?? "Unknown error",
                 Constants.RepoName,
