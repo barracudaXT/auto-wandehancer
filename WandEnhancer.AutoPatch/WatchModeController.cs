@@ -100,6 +100,18 @@ namespace WandEnhancer.AutoPatch
 
                 _logger.Info($"Watcher started for {watchPath}");
 
+                // Reconcile on startup. The watcher only patches in response to
+                // filesystem events, so an update that landed while it was not running
+                // -- WeMod auto-updating during boot, before the logon trigger starts us
+                // -- raises no event and would stay unpatched until Wand next changed.
+                // PatchDecision skips this cheaply when the current version is already
+                // patched, so it is one directory check in the common case.
+                if (Enabled)
+                {
+                    var reconcile = HandlePendingAsync(_lifetimeCts.Token);
+                    Interlocked.Exchange(ref _inFlightPatchTask, reconcile);
+                }
+
                 try
                 {
                     await Task.Delay(Timeout.Infinite, _lifetimeCts.Token);
