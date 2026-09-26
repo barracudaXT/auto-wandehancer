@@ -237,7 +237,7 @@ jobs:
           CERT_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
         run: |
           if ([string]::IsNullOrWhiteSpace($env:CERT_PFX_BASE64)) { return }
-          & scripts\sign-artifacts.ps1 -Files @('dist\WandEnhancerSetup.exe') `
+          & scripts\sign-artifacts.ps1 -Files @('dist\AutoWandEnhancerSetup.exe') `
             -PfxPath (Join-Path $env:RUNNER_TEMP 'signing.pfx') -PfxPassword $env:CERT_PASSWORD
           Remove-Item (Join-Path $env:RUNNER_TEMP 'signing.pfx') -Force
 
@@ -251,7 +251,7 @@ jobs:
           name: auto-wandehancer ${{ steps.version.outputs.tag }}
           body: |
             **auto-wandehancer** — the pre-built, self-updating distribution of
-            WandEnhancer. Download `WandEnhancerSetup.exe` and run it; it detects
+            WandEnhancer. Download `AutoWandEnhancerSetup.exe` and run it; it detects
             your Wand/WeMod folder and keeps itself patched from then on.
 
             Installs already running an older version can update from the tray
@@ -266,6 +266,6 @@ jobs:
             ### Changes
             See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md)
             · [upstream releases](https://github.com/k1tbyte/Wand-Enhancer/releases)
-          files: dist/WandEnhancerSetup.exe
+          files: dist/AutoWandEnhancerSetup.exe
           draft: false
           prerelease: false

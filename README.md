@@ -15,7 +15,7 @@ Pre-built installer with automatic updates — no manual Actions workflow needed
 executables — you fork it and run its build workflow yourself. This project does
 that part for you:
 
-- **Pre-built installer** — download `WandEnhancerSetup.exe` directly from [Releases](https://github.com/barracudaXT/auto-wandehancer/releases/latest) instead of building it yourself.
+- **Pre-built installer** — download `AutoWandEnhancerSetup.exe` directly from [Releases](https://github.com/barracudaXT/auto-wandehancer/releases/latest) instead of building it yourself.
 - **Automatic updates** — the tray watcher checks for new releases every 6 hours and offers one-click silent updates.
 - **Automated builds** — a scheduled workflow checks upstream every 6 hours and
   publishes a new release whenever this repository's version has not been
@@ -31,7 +31,7 @@ panel, custom scripts — is included unchanged.
 
 ## Installation
 
-1. Download **WandEnhancerSetup.exe** from the [latest release](https://github.com/barracudaXT/auto-wandehancer/releases/latest).
+1. Download **AutoWandEnhancerSetup.exe** from the [latest release](https://github.com/barracudaXT/auto-wandehancer/releases/latest).
 2. Run the installer — it auto-detects your Wand/WeMod folder.
 3. Accept the UAC prompt once.
 
@@ -95,7 +95,7 @@ The auto-patch system runs as a lightweight tray application with three modes:
 ```
 
 Runs the web panel build, restores and builds the solution, runs the patch-locator
-and fork test suites, and packages `dist\WandEnhancerSetup.exe`.
+and fork test suites, and packages `dist\AutoWandEnhancerSetup.exe`.
 
 Authenticode signing is performed by the release workflow
 (`.github/workflows/build-release.yml`), which signs the executables before the
