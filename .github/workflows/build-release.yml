@@ -1,4 +1,4 @@
-name: Build and Release
+﻿name: Build and Release
 
 on:
   schedule:
@@ -248,9 +248,9 @@ jobs:
           # Named for THIS project. The tag stays v<version> because the updater
           # parses it with Version.TryParse after trimming a leading v, so a
           # prefixed tag would not parse and would silently stop updates.
-          name: auto-wandenhancer ${{ steps.version.outputs.tag }}
+          name: auto-wandehancer ${{ steps.version.outputs.tag }}
           body: |
-            **auto-wandenhancer** — the pre-built, self-updating distribution of
+            **auto-wandehancer** — the pre-built, self-updating distribution of
             WandEnhancer. Download `WandEnhancerSetup.exe` and run it; it detects
             your Wand/WeMod folder and keeps itself patched from then on.
 

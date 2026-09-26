@@ -1,11 +1,11 @@
-; WandEnhancer installer with one-click auto-patch enablement.
+﻿; WandEnhancer installer with one-click auto-patch enablement.
 ; Build from the repository root with:
 ;   iscc installer\WandEnhancer.iss /DOutputDir=WandEnhancer\bin\Release
 
 ; Product name shown to users (Add/Remove Programs, Start Menu, wizard). The
 ; installed executable is still WandEnhancer.exe -- that is the app being
 ; distributed, and this project is the distribution of it.
-#define MyAppName "auto-wandenhancer"
+#define MyAppName "auto-wandehancer"
 ; AppId is deliberately unchanged. A new AppId would install alongside the old
 ; product instead of upgrading it, and the orphaned uninstaller would then run
 ; --disable-autopatch, killing the new watcher and deleting the scheduled task

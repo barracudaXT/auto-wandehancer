@@ -1,8 +1,8 @@
-<div align="center">
+﻿<div align="center">
 
 ![logo](assets/icon.svg)
 
-# auto-wandenhancer
+# auto-wandehancer
 
 Pre-built installer with automatic updates — no manual Actions workflow needed.
 
@@ -10,7 +10,7 @@ Pre-built installer with automatic updates — no manual Actions workflow needed
 
 ## What is this?
 
-**auto-wandenhancer** is a pre-built, self-updating distribution of
+**auto-wandehancer** is a pre-built, self-updating distribution of
 [WandEnhancer](https://github.com/k1tbyte/Wand-Enhancer). Upstream publishes no
 executables — you fork it and run its build workflow yourself. This project does
 that part for you:
@@ -75,7 +75,7 @@ The auto-patch system runs as a lightweight tray application with three modes:
 
 ### Disabling
 
-- **Via the installer:** Apps → Installed apps → **auto-wandenhancer** → Uninstall.
+- **Via the installer:** Apps → Installed apps → **auto-wandehancer** → Uninstall.
 - **Via the app:** Open Auto-patch setup (shield icon) → Disable.
 
 ## Building from Source

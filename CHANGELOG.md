@@ -1,4 +1,4 @@
-# Changelog
+﻿# Changelog
 
 This file is the source of truth for release notes.
 The newest entry must match the version in `BuildVersion.cs`.
@@ -24,7 +24,7 @@ The newest entry must match the version in `BuildVersion.cs`.
 ### Improvements
 
 - **Releases are named for this project**, and the installed product appears as
-  `auto-wandenhancer` instead of upstream's name.
+  `auto-wandehancer` instead of upstream's name.
 - **This fork versions its own releases.** Releases no longer mirror upstream's
   version number, so a fork-only fix can reach an existing install. Previously
   new bytes were published under an unchanged version, which the updater could
