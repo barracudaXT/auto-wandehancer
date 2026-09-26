@@ -25,7 +25,7 @@ Everything upstream does — patching, the auto-patch watcher, the remote web
 panel, custom scripts — is included unchanged.
 
 > **Versioning.** This project versions its own releases, independently of
-> upstream. `v2.1.1.0` packages this repository's sources; upstream's changes up
+> upstream. `v2.1.2.0` packages this repository's sources; upstream's changes up
 > to its own 2.1.0.0 are included and listed below it in the changelog. Each
 > release names the commit it was built from.
 

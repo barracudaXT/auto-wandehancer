@@ -14,7 +14,7 @@
 ; WandEnhancer.AutoPatch). CI overrides this with /DMyAppVersion=<release tag>
 ; so released installers always carry the real version.
 #ifndef MyAppVersion
-  #define MyAppVersion "2.1.1.0"
+  #define MyAppVersion "2.1.2.0"
 #endif
 #define MyAppPublisher "WandEnhancer Contributors"
 #define MyAppURL "https://github.com/barracudaXT/auto-wandehancer"

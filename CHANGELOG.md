@@ -3,6 +3,36 @@
 This file is the source of truth for release notes.
 The newest entry must match the version in `BuildVersion.cs`.
 
+## [2.1.2.0] - 2026-09-26
+
+### Fixes
+
+- **Failures are now written to a log file, so a problem can be reported.**
+  Errors were being discarded rather than logged. The launcher wrote its log
+  into the install directory, which is read-only for a standard user, so the
+  write failed and was swallowed; the log was also opened on only one of the
+  launch paths, leaving no log at all in normal use. Failures now go to
+  `%LocalAppData%\WandEnhancer\logs\`, the log target is verified by an actual
+  write to it rather than a test file beside it, and unhandled errors are
+  recorded before the app exits.
+- **Opening Wand no longer fails on an install that is already patched.** A
+  progress window was closed before it had been shown, and the exception that
+  followed aborted the launch instead of starting Wand. This affected the
+  everyday case of launching an install that needed no patching.
+- **Updater errors are recorded at their real severity.** Every message the
+  patcher and updater logged was written as informational, so failures appeared
+  as routine activity.
+
+### Improvements
+
+- **The installer is published as `AutoWandEnhancerSetup.exe`**, matching the
+  name of the product it installs. The installed application, its shortcuts and
+  its update path are unchanged, and existing installs continue to update.
+
+### Notes
+
+- Upstream's own changes for 2.1.0.0 and earlier are in the sections below.
+
 ## [2.1.1.0] - 2026-09-26
 
 ### Fixes
