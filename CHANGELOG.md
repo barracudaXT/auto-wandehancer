@@ -3,6 +3,29 @@
 This file is the source of truth for release notes.
 The newest entry must match the version in `BuildVersion.cs`.
 
+## [2.1.3.0] - 2026-09-26
+
+### Fixes
+
+- **Opening Wand starts Wand again.** After patching, the shortcut launched a
+  helper that exits without opening anything, so Wand never appeared and the
+  launcher reported success having started no application. The launcher now
+  runs the executable that actually starts Wand.
+- **Updating shortcuts no longer rewrites shortcuts that are not ours.** A
+  shortcut was treated as this installation's own whenever its target file was
+  named `Wand.exe`, so configuring one installation could repoint a shortcut
+  belonging to another. A shortcut is now only changed when it points inside
+  the installation being configured.
+- **Restoring shortcuts no longer stops at the first unreadable backup.** An
+  unrelated `*.lnk.original` file left by another program aborted the restore
+  and left the Wand shortcut pointing at the helper.
+
+### Notes
+
+- The test suite no longer terminates a running Wand or WeMod session, and no
+  longer rewrites shortcuts belonging to the machine it runs on.
+- Upstream's own changes for 2.1.0.0 and earlier are in the sections below.
+
 ## [2.1.2.0] - 2026-09-26
 
 ### Fixes
