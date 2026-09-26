@@ -28,7 +28,13 @@ namespace WandEnhancer.Core.Services
                 // Upstream 2.x owns the engine and takes its own config types, so the
                 // fork's bookkeeping config is mapped onto them here rather than being
                 // merged into the engine.
-                var rootDirectory = info.RootPath ?? info.BasePath;
+                // The engine resolves <root>\resources\app.asar, so it needs the payload
+                // directory (app-<version>), not the WeMod root that contains it. These
+                // two are named the other way round upstream, and the fork's WeModInfo
+                // follows upstream: RootPath is the WeMod root, BasePath is the payload.
+                // Passing RootPath made every patch fail with DirectoryNotFoundException
+                // on <WeMod>\resources\.incomplete-patch, aborting --launch with it.
+                var rootDirectory = info.BasePath ?? info.RootPath;
                 var exeName = PathExtensions.GetWeModExecutableName(rootDirectory)
                               ?? PathExtensions.GetWeModExecutableName(info.BasePath)
                               ?? "Wand.exe";

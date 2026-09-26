@@ -78,37 +78,30 @@ namespace WandEnhancer.AutoPatch
                     return true;
                 }
 
-                var mutexAcquired = false;
-                using (var patchMutex = new Mutex(false, @"Global\WandEnhancerAutoPatchLock"))
+                var lockAcquired = false;
+                // A named Semaphore rather than a named Mutex: both give cross-process
+                // exclusion, but a Mutex is owned by the acquiring thread and the awaits
+                // below resume on a different one, so ReleaseMutex() threw
+                // "Object synchronization method was called from an unsynchronized block
+                // of code" -- turning an already-successful patch into a reported failure.
+                // A Semaphore has no thread affinity, so it can be released from wherever
+                // the work finished.
+                using (var patchLock = new Semaphore(1, 1, @"Global\WandEnhancerAutoPatchLock"))
                 {
                     try
                     {
-                        try
-                        {
-                            mutexAcquired = patchMutex.WaitOne(0);
-                        }
-                        catch (AbandonedMutexException)
-                        {
-                            mutexAcquired = true;
-                        }
+                        lockAcquired = patchLock.WaitOne(0);
 
-                        if (!mutexAcquired)
+                        if (!lockAcquired)
                         {
                             progress?.Report("Waiting for another patch to finish...");
                             window?.SetStatus("Waiting for another patch to finish...");
-                            try
-                            {
-                                mutexAcquired = patchMutex.WaitOne(TimeSpan.FromSeconds(60));
-                            }
-                            catch (AbandonedMutexException)
-                            {
-                                mutexAcquired = true;
-                            }
+                            lockAcquired = patchLock.WaitOne(TimeSpan.FromSeconds(60));
                         }
 
-                        if (!mutexAcquired)
+                        if (!lockAcquired)
                         {
-                            _logger.Error("Timed out waiting for patch mutex.");
+                            _logger.Error("Timed out waiting for the patch lock.");
                             progress?.Report("Another patch is taking too long. Try again.");
                             window?.ShowFailure("Another patch is taking too long. Try again.");
                             return false;
@@ -166,8 +159,8 @@ namespace WandEnhancer.AutoPatch
                     }
                     finally
                     {
-                        if (mutexAcquired)
-                            patchMutex.ReleaseMutex();
+                        if (lockAcquired)
+                            patchLock.Release();
                     }
                 }
             }
