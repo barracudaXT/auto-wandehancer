@@ -14,6 +14,7 @@ jobs:
     outputs:
       new_version: ${{ steps.check.outputs.new_version }}
       upstream_tag: ${{ steps.check.outputs.upstream_tag }}
+      sync_upstream: ${{ steps.check.outputs.sync_upstream }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -23,7 +24,7 @@ jobs:
       - name: Test version gate
         run: bash scripts/test-upstream-version-gate.sh
 
-      - name: Check upstream for a newer release
+      - name: Check what needs publishing
         id: check
         run: |
           UPSTREAM_TAG=$(curl -s https://api.github.com/repos/k1tbyte/Wand-Enhancer/releases/latest \
@@ -32,22 +33,40 @@ jobs:
           OUR_TAG=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest \
             | jq -r '.tag_name // empty')
 
-          echo "Upstream: ${UPSTREAM_TAG:-none}, Ours: ${OUR_TAG:-none}"
+          # This fork versions its own releases, so what says whether there is
+          # something to publish is this repository's own version -- NOT upstream's.
+          # Gating on upstream was wrong twice over: it republished an unchanged
+          # release every 6 hours, and (as a version mirror) it could never ship a
+          # fork-only fix to an install that already had that number.
+          # BuildVersion.cs is the one version source the build compiles from, and
+          # release validation asserts the built installer carries it.
+          REPO_VERSION=$(sed -nE 's/.*AssemblyFileVersion\("([0-9]+(\.[0-9]+)+)"\).*/\1/p' BuildVersion.cs | head -n1)
+          if [ -z "$REPO_VERSION" ]; then
+            echo "::error::Could not read AssemblyFileVersion from BuildVersion.cs."
+            exit 1
+          fi
 
-          # Version-aware compare, NOT a string compare: upstream tags plain
-          # ("2.1.0.0") and this fork tags with a leading v ("v2.1.0.0"), so
-          # "$UPSTREAM_TAG" = "$OUR_TAG" was never true and the 6-hourly schedule
-          # reported a new upstream version on every single run -- republishing
-          # the same release four times a day. See scripts/upstream-version-gate.sh
-          # and its check, scripts/test-upstream-version-gate.sh.
-          NEW_VERSION=$(bash scripts/upstream-version-gate.sh "$UPSTREAM_TAG" "$OUR_TAG")
+          echo "Upstream: ${UPSTREAM_TAG:-none}, ours: ${OUR_TAG:-none}, repo version: $REPO_VERSION"
+
+          # Version-aware compare, not a string compare: tags carry a leading v
+          # ("v2.1.1.0") while our versions do not ("2.1.1.0"), so an equality test
+          # on the raw strings would always say "something to do".
+          NEW_VERSION=$(bash scripts/upstream-version-gate.sh "$REPO_VERSION" "$OUR_TAG")
           echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
           echo "upstream_tag=$UPSTREAM_TAG" >> "$GITHUB_OUTPUT"
 
+          # Independent of the above: whether upstream has moved past the version we
+          # build. Decides only whether to merge upstream before building.
+          SYNC_UPSTREAM=$(bash scripts/upstream-version-gate.sh "$UPSTREAM_TAG" "$REPO_VERSION")
+          echo "sync_upstream=$SYNC_UPSTREAM" >> "$GITHUB_OUTPUT"
+
           if [ "$NEW_VERSION" = "true" ]; then
-            echo "New upstream version detected: $UPSTREAM_TAG"
+            echo "Version $REPO_VERSION has not been released yet; publishing."
           else
-            echo "Already up to date; nothing to publish."
+            echo "Version $REPO_VERSION is already the latest release; nothing to publish."
+          fi
+          if [ "$SYNC_UPSTREAM" = "true" ]; then
+            echo "Upstream $UPSTREAM_TAG is ahead of $REPO_VERSION; merging it into this build."
           fi
 
   build:
@@ -62,7 +81,7 @@ jobs:
 
       - name: Sync upstream source
         id: sync
-        if: needs.check-upstream.outputs.new_version == 'true'
+        if: needs.check-upstream.outputs.sync_upstream == 'true'
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
@@ -83,7 +102,7 @@ jobs:
       # upstream release applies directly instead of being reported as inapplicable.
       # Releases are still versioned from this fork's own assembly version.
       - name: Report upstream sync applicability
-        if: needs.check-upstream.outputs.new_version == 'true'
+        if: needs.check-upstream.outputs.sync_upstream == 'true'
         run: |
           if [ "${{ steps.sync.outputs.src_changed }}" = "true" ]; then
             echo "Upstream ${{ needs.check-upstream.outputs.upstream_tag }} changed the build tree; the build below includes it."
@@ -157,14 +176,12 @@ jobs:
       - name: Determine version
         id: version
         run: |
-          # Version the release from this fork's own assembly, not from the
-          # upstream tag. These releases currently mirror upstream's numbering,
-          # so this yields v2.1.0.0 while upstream tags 2.1.0.0 -- the version
-          # gate normalises the leading v and treats the pair as equal.
-          # NOTE: the gate compares versions, which only answers "is upstream
-          # ahead?" while both lines share one numbering. If this fork ever
-          # versions independently, the gate must stop comparing versions and
-          # start tracking which upstream tag has been consumed.
+          # The release is versioned from this fork's own assembly, which
+          # BuildVersion.cs sets. It is deliberately independent of upstream's
+          # numbering: releases used to mirror upstream's version, so a fork-only
+          # fix was published under a number an existing install already had, and
+          # the updater -- which compares the installed version to the newest tag
+          # -- could not see it. See the version gate step for what is published.
           $dll = "WandEnhancer\bin\Release\WandEnhancer.exe"
           $ver = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($dll).FileVersion
           echo "tag=v$ver" >> $env:GITHUB_OUTPUT
@@ -231,20 +248,23 @@ jobs:
           # Named for THIS project. The tag stays v<version> because the updater
           # parses it with Version.TryParse after trimming a leading v, so a
           # prefixed tag would not parse and would silently stop updates.
-          name: auto-wandehancer ${{ steps.version.outputs.tag }}
+          name: auto-wandenhancer ${{ steps.version.outputs.tag }}
           body: |
-            Auto-built **auto-wandenhancer** — the pre-built, self-updating fork of
-            Wand-Enhancer. Download `WandEnhancerSetup.exe` and run it; it detects
+            **auto-wandenhancer** — the pre-built, self-updating distribution of
+            WandEnhancer. Download `WandEnhancerSetup.exe` and run it; it detects
             your Wand/WeMod folder and keeps itself patched from then on.
 
+            Installs already running an older version can update from the tray
+            icon (right-click → *Update available*).
+
             ### About this version
-            This release tracks upstream's version number, so
-            `${{ steps.version.outputs.tag }}` is upstream's version and not a
-            separate fork version. The build is this fork's own sources at
-            `${{ github.sha }}`.
+            `${{ steps.version.outputs.tag }}` is this project's own version,
+            independent of upstream's. It is built from this repository's sources
+            at `${{ github.sha }}`; upstream's changes up to its own 2.1.0.0 are
+            included.
 
             ### Changes
-            Upstream release notes: [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md)
+            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md)
             · [upstream releases](https://github.com/k1tbyte/Wand-Enhancer/releases)
           files: dist/WandEnhancerSetup.exe
           draft: false

@@ -17,15 +17,17 @@ that part for you:
 
 - **Pre-built installer** — download `WandEnhancerSetup.exe` directly from [Releases](https://github.com/barracudaXT/auto-wandehancer/releases/latest) instead of building it yourself.
 - **Automatic updates** — the tray watcher checks for new releases every 6 hours and offers one-click silent updates.
-- **Automated builds** — a scheduled workflow checks upstream every 6 hours, merges it with this repository's files winning, builds the installer, and publishes a release.
+- **Automated builds** — a scheduled workflow checks upstream every 6 hours and
+  publishes a new release whenever this repository's version has not been
+  released yet, merging upstream first with this repository's files winning.
 
 Everything upstream does — patching, the auto-patch watcher, the remote web
 panel, custom scripts — is included unchanged.
 
-> **Versioning.** This project tracks upstream's version number, so release
-> `v2.1.0.0` is *upstream's* version, not a separate auto-wandenhancer version.
-> The build is this repository's own sources; each release names the commit it
-> was built from.
+> **Versioning.** This project versions its own releases, independently of
+> upstream. `v2.1.1.0` packages this repository's sources; upstream's changes up
+> to its own 2.1.0.0 are included and listed below it in the changelog. Each
+> release names the commit it was built from.
 
 ## Installation
 

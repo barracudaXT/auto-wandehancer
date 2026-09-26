@@ -3,6 +3,37 @@
 This file is the source of truth for release notes.
 The newest entry must match the version in `BuildVersion.cs`.
 
+## [2.1.1.0] - 2026-09-26
+
+### Fixes
+
+- **Auto-patch now actually patches.** Three faults on the patch path each
+  reported success or nothing at all: the patch engine was handed the WeMod root
+  instead of the payload folder, so every patch failed on a missing path and
+  opening Wand aborted with it; the patch lock was a mutex released after an
+  await, so a patch that had already succeeded was reported as failed; and the
+  watcher only reacted to file changes, so an update that landed while it was not
+  running was never patched. Until this release, `app-12.57.0` had never been
+  patched at all.
+- **Auto-patch survives an update.** A silent install shows no tasks page, so
+  the step that re-creates the watcher was skipped, and every update left
+  auto-patch off until the next one. The installer is now driven with
+  `/MERGETASKS=autopatch`, and the watcher is shipped with the assembly it
+  loads, without which it could not start at all.
+
+### Improvements
+
+- **Releases are named for this project**, and the installed product appears as
+  `auto-wandenhancer` instead of upstream's name.
+- **This fork versions its own releases.** Releases no longer mirror upstream's
+  version number, so a fork-only fix can reach an existing install. Previously
+  new bytes were published under an unchanged version, which the updater could
+  not see.
+
+### Notes
+
+- Upstream's own changes for 2.1.0.0 and earlier are in the sections below.
+
 ## [2.1.0.0] - 2026-09-09
 
 ### Features
