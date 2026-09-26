@@ -49,8 +49,11 @@ namespace WandEnhancer.AutoPatch
         {
             // Launch the root stub when available (WeMod uses a launcher in the
             // parent folder that delegates to the latest app-* payload folder).
+            // Wand.exe is tried first: on a patched install WeMod.exe is
+            // Wand-Migrator, which exits without starting Wand, so preferring it
+            // makes the launch fail silently and report success.
             var rootPath = info.RootPath ?? info.BasePath;
-            var rootStubNames = new[] { "WeMod.exe", "Wand.exe" };
+            var rootStubNames = new[] { "Wand.exe", "WeMod.exe" };
             foreach (var name in rootStubNames)
             {
                 var stubPath = Path.Combine(rootPath, name);

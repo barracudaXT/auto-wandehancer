@@ -79,9 +79,21 @@ namespace WandEnhancer.Core.Services
                 if (!File.Exists(backupPath))
                     continue;
 
-                var json = File.ReadAllText(backupPath);
-                var backup = JsonConvert.DeserializeObject<ShortcutBackup>(json);
-                if (backup == null)
+                // A backup we cannot read is not ours to touch, and it must not stop us
+                // restoring the rest: the search covers every *.lnk.original under the
+                // real Desktop and Start Menu, so an unrelated one from another program
+                // is enough to throw here and strand the genuine Wand backups.
+                ShortcutBackup backup;
+                try
+                {
+                    backup = JsonConvert.DeserializeObject<ShortcutBackup>(File.ReadAllText(backupPath));
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (backup == null || string.IsNullOrWhiteSpace(backup.TargetPath))
                     continue;
 
                 Shortcut.CreateShortcut(
@@ -132,7 +144,8 @@ namespace WandEnhancer.Core.Services
                             continue;
 
                         if (candidatePaths.Any(candidate => IsSameTarget(shortcut.TargetPath, candidate)) ||
-                            candidateNames.Any(name => shortcut.TargetPath.EndsWith(name, StringComparison.OrdinalIgnoreCase)))
+                            (PointsIntoDirectory(shortcut.TargetPath, wandPath) &&
+                             candidateNames.Any(name => name.Equals(Path.GetFileName(shortcut.TargetPath), StringComparison.OrdinalIgnoreCase))))
                         {
                             result.Add(shortcutPath);
                         }
@@ -168,6 +181,26 @@ namespace WandEnhancer.Core.Services
             yield return Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory);
             yield return Environment.GetFolderPath(Environment.SpecialFolder.StartMenu);
             yield return Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu);
+        }
+
+        // Shortcuts are ours to rewrite only when they point into the installation
+        // we were given. Matching on the file name alone rewrote any shortcut
+        // ending in Wand.exe anywhere on the machine: re-registering for a
+        // synthetic path (a test fixture's temp folder) repointed the user's real
+        // Start Menu shortcut at that path and reported success, and because the
+        // rewritten target no longer ends in Wand.exe, no later reinstall could
+        // recognise it to repair it.
+        private static bool PointsIntoDirectory(string targetPath, string directory)
+        {
+            if (string.IsNullOrWhiteSpace(targetPath) || string.IsNullOrWhiteSpace(directory))
+                return false;
+
+            var target = Path.GetFullPath(targetPath);
+            var root = Path.GetFullPath(directory)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                + Path.DirectorySeparatorChar;
+
+            return target.StartsWith(root, StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsSameTarget(string a, string b)

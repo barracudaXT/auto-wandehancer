@@ -50,6 +50,7 @@
   <ItemGroup>
     <Compile Include="Fakes.cs" />
     <Compile Include="LauncherLogTests.cs" />
+    <Compile Include="LaunchPathAndShortcutGuardTests.cs" />
     <Compile Include="UpdateDetectionTests.cs" />
     <Compile Include="UpdateIntegrityTests.cs" />
     <Compile Include="UpdateHandoffTests.cs" />
