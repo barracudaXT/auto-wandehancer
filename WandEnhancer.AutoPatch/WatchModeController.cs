@@ -108,8 +108,7 @@ namespace WandEnhancer.AutoPatch
                 // patched, so it is one directory check in the common case.
                 if (Enabled)
                 {
-                    var reconcile = HandlePendingAsync(_lifetimeCts.Token);
-                    Interlocked.Exchange(ref _inFlightPatchTask, reconcile);
+                    ReconcileOnStartup();
                 }
 
                 try
@@ -138,6 +137,16 @@ namespace WandEnhancer.AutoPatch
                     }
                 }
             }, token);
+        }
+
+        // Patch anything that changed while the watcher was not running. Kept as a named
+        // method so release validation can assert the reconcile is still wired to startup:
+        // without it an update that lands while the watcher is down raises no event and
+        // stays unpatched, which is silent.
+        private void ReconcileOnStartup()
+        {
+            var reconcile = HandlePendingAsync(_lifetimeCts.Token);
+            Interlocked.Exchange(ref _inFlightPatchTask, reconcile);
         }
 
         private void OnChanged(object sender, FileSystemEventArgs e)

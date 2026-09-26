@@ -199,3 +199,33 @@ $updaterArgs = Select-String -Path $updaterPath -Pattern 'Arguments\s+=' | Selec
 if (-not $updaterArgs -or $updaterArgs.Line -notmatch '/MERGETASKS=autopatch') {
     throw 'The updater must pass /MERGETASKS=autopatch, or a silent install skips auto-patch setup.'
 }
+
+# The patch engine resolves the asar inside the payload's resources folder, so the
+# directory handed to it must be the payload folder, not the WeMod root that contains
+# it. WeModInfo names these the other way round (RootPath = WeMod root, BasePath =
+# payload), so passing RootPath fails every patch with DirectoryNotFoundException,
+# silently.
+$patcherPath = Join-Path $repoRoot 'WandEnhancer.Core\Services\Patcher.cs'
+if (-not (Test-Path $patcherPath)) { throw "Patcher not found: $patcherPath" }
+$patcherContent = Get-Content -Path $patcherPath -Raw
+if ($patcherContent -notmatch 'var\s+rootDirectory\s*=\s*info\.BasePath\s*\?\?\s*info\.RootPath') {
+    throw 'Patcher must pass the payload directory (info.BasePath) to the patch engine; RootPath is the WeMod root, which has no resources folder.'
+}
+
+# A named Mutex released after an await throws, because the continuation resumes on a
+# different thread. The patch lock must not be a Mutex.
+$patchControllerPath = Join-Path $repoRoot 'WandEnhancer.AutoPatch\PatchModeController.cs'
+if (-not (Test-Path $patchControllerPath)) { throw "Patch controller not found: $patchControllerPath" }
+$patchControllerContent = Get-Content -Path $patchControllerPath -Raw
+if ($patchControllerContent -match 'new\s+Mutex\s*\(') {
+    throw 'The patch lock must not be a Mutex: it is released after awaits, which resume on another thread and make ReleaseMutex throw.'
+}
+
+# The watcher patches only on filesystem events, so an update that lands while it is
+# not running would never be patched. It must reconcile once at startup.
+$watchControllerPath = Join-Path $repoRoot 'WandEnhancer.AutoPatch\WatchModeController.cs'
+if (-not (Test-Path $watchControllerPath)) { throw "Watch controller not found: $watchControllerPath" }
+$watchControllerContent = Get-Content -Path $watchControllerPath -Raw
+if ($watchControllerContent -notmatch 'if\s*\(Enabled\)\s*\{\s*ReconcileOnStartup\(\)') {
+    throw 'WatchModeController must reconcile on startup, or an update that lands while the watcher is down stays unpatched.'
+}
